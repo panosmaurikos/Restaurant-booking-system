@@ -40,6 +40,19 @@ jobs:
           docker run --network=host instrumentisto/nmap -sS -sV -sC -O -T4 -v -p- -oX nmap-full-scan.xml -oN nmap-full-scan.txt 
       - name: List scan files
         run: ls -l
+      - name: Verify scan files were created
+        run: |
+            echo "=== Checking for scan files ==="
+            ls -la
+            if [ -f "nmap-full-scan.xml" ] && [ -f "nmap-full-scan.txt" ]; then
+            echo "✅ Scan files created successfully!"
+            echo "XML file size: $(wc -l < nmap-full-scan.xml) lines"
+            echo "TXT file size: $(wc -l < nmap-full-scan.txt) lines"
+            else
+            echo "❌ Scan files NOT found! Something went wrong with the nmap scan."
+            exit 1
+            fi
+            
       - name: Generate beautiful HTML reports
         run: |
           # Install required tools
@@ -48,7 +61,7 @@ jobs:
 
           # Generate standard HTML report
           if [ -f "/usr/share/nmap/nmap.xsl" ]; then
-            xsltproc -o nmap-standard.html /usr/share/nmap/nmap.xsl nmap-full-scan.xml
+            xsltproc -o nmap-standard.html /usr/share/nmap/nmap.xsl nmap-full-scan.xml localhost
           else
             curl -s https://svn.nmap.org/nmap/docs/nmap.xsl -o nmap.xsl
             xsltproc -o nmap-standard.html nmap.xsl nmap-full-scan.xml
@@ -56,16 +69,16 @@ jobs:
 
           # Create beautiful summary report
           cat > nmap-summary.md << 'EOF'
-            # 🛡️ Nmap Security Scan Report
+            #  Nmap Security Scan Report
 
-            ## 📅 Scan Details
+            ##  Scan Details
             - **Date**: $(date)
             - **Target**: localhost
             - **Scan Type**: Comprehensive Security Scan (-sS -sV -sC -O)
 
-            ## 📊 Scan Results Summary
+            ##  Scan Results Summary
 
-            ### 🚪 Open Ports Found
+            ###  Open Ports Found
             ```bash
             $(grep "open" nmap-full-scan.txt | sort -n | head -20)
             ```
