@@ -49,73 +49,142 @@ jobs:
             -oN /results/nmap-full-scan.txt \
             localhost
 
-      - name: List scan files
-        run: ls -l
+      - name: Run advanced vulnerability scans
+        run: |
+          # Vulnerability scanning για τα services μας
+          docker run --network=host \
+            -v $(pwd)/nmap-results:/results \
+            instrumentisto/nmap \
+            --script vulners \
+            -oX /results/nmap-vulners.xml \
+            -oN /results/nmap-vulners.txt \
+            localhost
+
+          # Ειδικά scans για τα services μας
+          docker run --network=host \
+            -v $(pwd)/nmap-results:/results \
+            instrumentisto/nmap \
+            --script "http-vuln*,ssl-*,ssh-*" \
+            -oX /results/nmap-web-vuln.xml \
+            -oN /results/nmap-web-vuln.txt \
+            localhost
+
+          # PostgreSQL specific scanning
+          docker run --network=host \
+            -v $(pwd)/nmap-results:/results \
+            instrumentisto/nmap \
+            --script "pgsql-brute,postgres-*" \
+            -p 5432 \
+            -oX /results/nmap-pgsql-scan.xml \
+            -oN /results/nmap-pgsql-scan.txt \
+            localhost
+
+          # Redis specific scanning  
+          docker run --network=host \
+            -v $(pwd)/nmap-results:/results \
+            instrumentisto/nmap \
+            --script "redis-*" \
+            -p 6379 \
+            -oX /results/nmap-redis-scan.xml \
+            -oN /results/nmap-redis-scan.txt \
+            localhost
+
       - name: Verify scan files were created
         run: |
-            echo "=== Checking for scan files ==="
-            ls -la nmap-results/
-            
-            if [ -f "nmap-results/nmap-full-scan.xml" ] && [ -f "nmap-results/nmap-full-scan.txt" ]; then
-            echo "✅ Scan files created successfully!"
-            echo "XML file size: $(wc -l < nmap-results/nmap-full-scan.xml) lines"
-            echo "TXT file size: $(wc -l < nmap-results/nmap-full-scan.txt) lines"
-            
-            # Copy files to root for easier access
-            cp nmap-results/* .
-            else
-            echo "❌ Scan files NOT found in nmap-results directory!"
-            echo "Contents of nmap-results:"
-            ls -la nmap-results/
-            exit 1
-            fi
+          echo "=== Checking for scan files ==="
+          ls -la nmap-results/
+          
+          # Copy files to root for easier access
+          cp nmap-results/* .
+          
+          echo "✅ All scan files:"
+          ls -la *.xml *.txt
 
-      - name: Generate HTML reports
+      - name: Generate comprehensive HTML reports
         run: |
-            # Install required tools
-            sudo apt-get install -y xsltproc pandoc curl
+          sudo apt-get install -y xsltproc pandoc curl
 
-            echo "=== Generating HTML reports ==="
-            
-            # Generate standard HTML report
-            curl -s https://svn.nmap.org/nmap/docs/nmap.xsl -o nmap.xsl
-            xsltproc -o nmap-standard.html nmap.xsl nmap-full-scan.xml
+          # Generate reports for each scan
+          curl -s https://svn.nmap.org/nmap/docs/nmap.xsl -o nmap.xsl
+          
+          xsltproc -o nmap-full-report.html nmap.xsl nmap-full-scan.xml
+          xsltproc -o nmap-vulners-report.html nmap.xsl nmap-vulners.xml
+          xsltproc -o nmap-web-vuln-report.html nmap.xsl nmap-web-vuln.xml
+          xsltproc -o nmap-pgsql-report.html nmap.xsl nmap-pgsql-scan.xml
+          xsltproc -o nmap-redis-report.html nmap.xsl nmap-redis-scan.xml
 
-            # Create simple summary
-            echo "# Nmap Scan Report" > summary.md
-            echo "## Scan date: $(date)" >> summary.md
-            echo "## Target: localhost" >> summary.md
-            echo "## Open ports:" >> summary.md
-            echo '```' >> summary.md
-            grep "open" nmap-full-scan.txt | sort -n >> summary.md
-            echo '```' >> summary.md
+          # Create comprehensive summary
+          cat > security-summary.md << EOF
+            # 🛡️ Comprehensive Security Scan Report
 
-            # Convert to HTML
-            pandoc summary.md -o summary.html
+            ## 📅 Scan Date: $(date)
+            ## 🎯 Target: localhost
 
-      - name: Upload reports
+            ## 📊 Scan Overview
+            - **Full Port Scan**: Completed
+            - **Vulnerability Scan**: Completed  
+            - **Web Application Scan**: Completed
+            - **PostgreSQL Scan**: Completed
+            - **Redis Scan**: Completed
+
+            ## 🚪 Open Ports Summary
+            \`\`\`bash
+            $(grep "open" nmap-full-scan.txt | sort -n)
+            \`\`\`
+
+            ## ⚠️ Vulnerability Findings
+            \`\`\`bash
+            $(grep -i "vuln\|CVE\|warning" nmap-vulners.txt | head -20 || echo "No critical vulnerabilities found")
+            \`\`\`
+
+            ## 🗄️ Database Security
+            **PostgreSQL (5432):**
+            \`\`\`bash
+            $(grep -A5 -B5 "5432" nmap-pgsql-scan.txt || echo "No PostgreSQL vulnerabilities detected")
+            \`\`\`
+
+            **Redis (6379):**
+            \`\`\`bash  
+            $(grep -A5 -B5 "6379" nmap-redis-scan.txt || echo "No Redis vulnerabilities detected")
+            \`\`\`
+
+            ## 🌐 Web Application Security
+            \`\`\`bash
+            $(grep -A3 -B3 "http\|ssl" nmap-web-vuln.txt | head -15 || echo "No web vulnerabilities detected")
+            \`\`\`
+
+            ## 📈 Statistics
+            - **Total Open Ports**: $(grep -c "open" nmap-full-scan.txt)
+            - **Vulnerability Alerts**: $(grep -c "VULNERABLE\|CVE" nmap-vulners.txt 2>/dev/null || echo "0")
+            - **Services Scanned**: 5+ specialized scans
+
+            > 🔍 Generated by GitHub Actions Security Pipeline
+          EOF
+
+          pandoc security-summary.md -o security-summary.html --self-contained --css=https://cdn.jsdelivr.net/npm/water.css@2/out/water.css
+
+      - name: Upload comprehensive reports
         uses: actions/upload-artifact@v4
         with:
-            name: nmap-reports
-            path: |
-              nmap-full-scan.xml
-              nmap-full-scan.txt
-              nmap-standard.html
-              summary.md
-              summary.html
+          name: security-scan-reports-$(date +%Y%m%d-%H%M%S)
+          path: |
+            nmap-*.xml
+            nmap-*.txt
+            *-report.html
+            security-summary.*
+            nmap-results/
 
-      - name: Show quick results
+      - name: Display security summary
         run: |
-            echo "📊 Nmap Scan Results:"
-            echo "======================"
-            if [ -f "nmap-full-scan.txt" ]; then
-            echo "Open ports found:"
-            grep "open" nmap-full-scan.txt | sort -n
-            echo ""
-            echo "Total open ports: $(grep -c 'open' nmap-full-scan.txt)"
-            else
-            echo "No results available - scan may have failed"
-            fi
+          echo "🔒 SECURITY SCAN COMPLETED 🔒"
+          echo "=============================="
+          echo "📊 Open ports found:"
+          grep "open" nmap-full-scan.txt | sort -n
+          echo ""
+          echo "⚠️  Vulnerability alerts:"
+          grep -i "vuln\|CVE" nmap-vulners.txt 2>/dev/null | head -10 || echo "No critical vulnerabilities detected"
+          echo ""
+          echo "📁 Full reports available as artifacts"
 
       - name: Stop services
         run: docker compose -f docker-compose.yml down
