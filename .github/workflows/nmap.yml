@@ -41,20 +41,20 @@ jobs:
 
       - name: Generate beautiful HTML reports
         run: |
-            # Install required tools
-            sudo apt-get update
-            sudo apt-get install -y xsltproc pandoc curl
+          # Install required tools
+          sudo apt-get update
+          sudo apt-get install -y xsltproc pandoc curl
 
-            # Generate standard HTML report
-            if [ -f "/usr/share/nmap/nmap.xsl" ]; then
-            xsltproc -o nmap-standard.html /usr/share/nmap/nmap.xsl nmap-report.xml
-            else
+          # Generate standard HTML report
+          if [ -f "/usr/share/nmap/nmap.xsl" ]; then
+            xsltproc -o nmap-standard.html /usr/share/nmap/nmap.xsl nmap-full-scan.xml
+          else
             curl -s https://svn.nmap.org/nmap/docs/nmap.xsl -o nmap.xsl
-            xsltproc -o nmap-standard.html nmap.xsl nmap-report.xml
-            fi
+            xsltproc -o nmap-standard.html nmap.xsl nmap-full-scan.xml
+          fi
 
-            # Create beautiful summary report
-            cat > nmap-summary.md << 'EOF'
+          # Create beautiful summary report
+          cat > nmap-summary.md << 'EOF'
             # 🛡️ Nmap Security Scan Report
 
             ## 📅 Scan Details
@@ -66,7 +66,12 @@ jobs:
 
             ### 🚪 Open Ports Found
             ```bash
-            $(grep "open" nmap-report.txt | sort -n | head -20)
+            $(grep "open" nmap-full-scan.txt | sort -n | head -20)
+            ```
+          EOF
+
+          # Convert markdown summary to HTML
+          pandoc nmap-summary.md -o nmap-summary.html
 
       - name: Stop services
         run: docker compose -f docker-compose.yml down
