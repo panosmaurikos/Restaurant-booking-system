@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Restaurant Reservation - Book a Table</title>
+    <link rel="stylesheet" type="text/css" href="/css/res_form.css" />
+    <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
+  </head>
+  <body>
+    <div class="header">
+      <div class="letter">Restaurant Reservation System</div>
+      <div class="header-buttons">
+        <button id="login-btn" onclick="location.href='/pages/login.html'">
+          Login
+        </button>
+        <button
+          id="register-btn"
+          onclick="location.href='/pages/register.html'"
+        >
+          Register
+        </button>
+        <div class="welcome_logout">
+          <span id="welcome-message" style="padding-right: 20px"></span>
+          <button id="logout-btn" style="display: none">Logout</button>
+        </div>
+      </div>
+    </div>
+    <img
+      class="logo"
+      src="/images/Screenshot 2025-02-03 220219.png"
+      alt="Restaurant Logo"
+    />
+    <button class="previous" id="back-page">Back</button>
+    <div class="reservation-container">
+      <h2>Book a Table</h2>
+      <p>Fill the details to make a reservation.</p>
+      <form id="confirmForm">
+        <input
+          id="surname"
+          class="input-field"
+          type="text"
+          name="surname"
+          placeholder="Surname"
+          required
+        />
+        <input
+          id="name"
+          class="input-field"
+          type="text"
+          name="name"
+          placeholder="Name"
+          required
+        />
+        <input
+          id="phone"
+          class="input-field"
+          type="tel"
+          name="phone"
+          placeholder="Phone"
+          required
+        />
+        <input
+          id="email"
+          class="input-field"
+          type="email"
+          name="email"
+          placeholder="Email"
+          required
+        />
+        <textarea
+          id="notes"
+          class="input-field"
+          name="notes"
+          placeholder="Special requests (optional)"
+          rows="3"
+        ></textarea>
+        <label class="checkbox-label isConnected" style="padding-bottom: 10px">
+          <input type="checkbox" name="profile" />
+          Do you want to create an account?
+        </label>
+        <div class="birth">
+          <label for="birthDate">Date</label>
+          <input
+            type="date"
+            id="birthDate"
+            name="date"
+            style="margin-bottom: 10px; padding: 5px"
+          />
+        </div>
+        <label class="checkbox-label">
+          <input type="checkbox" name="terms" required />
+          I agree to the
+          <a style="color: #b25c2a" href="/pages/reservation-policy.html">Reservation Terms</a>
+        </label>
+        <p style="font-size: 15px">
+          You can cancel your reservation up to 24 hours before your scheduled
+          time.
+        </p>
+        <button class="reserve-btn" id="confirm_data" type="submit">
+          Confirm Reservation
+        </button>
+      </form>
+    </div>
+    <div class="footer">
+      <p>&copy; 2025 Restaurant Reservation System. All rights reserved.</p>
+      
+    </div>
+    <script src="/scripts/res_form.js"></script>
+  </body>
+</html>

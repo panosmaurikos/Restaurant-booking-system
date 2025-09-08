@@ -1,0 +1,23 @@
+name: DevSecOps Orchestrator
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+  pull-requests: write
+  security-events: write
+
+jobs:
+  trufflehog:
+    uses: ./.github/workflows/trufflehog.yml
+
+  snyk:
+    uses: ./.github/workflows/snyk.yml
+
+  nmap:
+    uses: ./.github/workflows/nmap.yml

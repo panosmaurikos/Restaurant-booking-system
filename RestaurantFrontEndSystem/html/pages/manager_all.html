@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manager - Reservations</title>
+    <link rel="stylesheet" type="text/css" href="/css/manager_all.css" />
+    <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
+  </head>
+  <body>
+    <div class="header">
+      <div class="letter">Manager Panel - Restaurant Reservations</div>
+      <div class="user-info" style="padding-right: 10px">
+        <span id="welcome-message" style="padding-right: 20px"></span>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </div>
+    </div>
+    <img
+      class="logo"
+      src="/images/Screenshot 2025-02-03 220219.png"
+      alt="Restaurant Logo"
+    />
+    <div class="filter-container">
+      <h3>Filter Reservations</h3>
+      <div class="filter-grid">
+        <div class="filter-group">
+          <label for="table_number">Table Number</label>
+          <input type="text" id="table_number" placeholder="Table Number" />
+        </div>
+        <div class="filter-group">
+          <label for="user_name">Name</label>
+          <input type="text" id="user_name" placeholder="Name" />
+        </div>
+        <div class="filter-group">
+          <label for="email_address">Email</label>
+          <input type="email" id="email_address" placeholder="Email" />
+        </div>
+        <div class="filter-group">
+          <label for="telephone">Telephone</label>
+          <input type="tel" id="telephone" placeholder="Phone" />
+        </div>
+        <div class="filter-group">
+          <label for="date_resv">Date</label>
+          <input type="date" id="date_resv" />
+        </div>
+        <div class="filter-group">
+          <label for="date_time">Time</label>
+          <input type="time" id="date_time" />
+        </div>
+      </div>
+      <button
+        id="applyFiltersBtn"
+        class="logout-btn"
+        style="background-color: #b25c2a"
+      >
+        Apply Filters
+      </button>
+    </div>
+    <div class="table-wrapper">
+      <table class="reservations-table" id="reservationsTable">
+        <tr>
+          <th>Table Number</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Actions</th>
+        </tr>
+        <!-- Add your table rows here -->
+      </table>
+    </div>
+
+    <!-- Update Modal -->
+    <div id="updateModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <p>
+          Update reservation with ID: <span id="updateReservationId"></span>
+        </p>
+        <div>
+          <form id="updateReservationForm">
+            <label for="updateTableNumber">Table Number</label>
+            <input
+              type="text"
+              id="updateTableNumber"
+              name="tableNumber"
+              required
+            />
+
+            <label for="updatePeople">Number of People</label>
+            <input type="text" id="updatePeople" name="people" />
+
+            <label for="updateSurname">Surname</label>
+            <input type="text" id="updateSurname" name="surname" />
+
+            <label for="updateName">Name</label>
+            <input type="text" id="updateName" autocomplete="on" name="name" />
+
+            <label for="updatePhone">Phone</label>
+            <input type="tel" id="updatePhone" autocomplete="on" name="phone" />
+
+            <label for="updateEmail">Email</label>
+            <input
+              type="email"
+              id="updateEmail"
+              autocomplete="on"
+              name="email"
+            />
+
+            <label for="updateNotes">Notes</label>
+            <textarea id="updateNotes" name="notes" rows="3"></textarea>
+
+            <label for="updateDate">Date</label>
+            <input type="date" id="updateDate" name="date" />
+
+            <label for="updateTime">Time</label>
+            <input type="time" id="updateTime" name="time" />
+          </form>
+        </div>
+        <button class="logout-btn" id="confirmUpdate">Confirm Update</button>
+      </div>
+    </div>
+
+    <!-- Cancel Modal -->
+    <div id="cancelModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <p>
+          Are you sure you want to cancel reservation with ID:
+          <span id="cancelReservationId"></span>?
+        </p>
+        <button class="logout-btn" id="confirmCancel">Confirm Cancel</button>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>&copy; 2025 Restaurant Reservation System. All rights reserved.</p>
+    </div>
+    <script src="/scripts/manager_all.js"></script>
+  </body>
+</html>

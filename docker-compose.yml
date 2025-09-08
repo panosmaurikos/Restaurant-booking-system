@@ -1,0 +1,73 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:latest
+    container_name: restaurant_database
+    environment:
+      POSTGRES_DB: reservsystem
+      POSTGRES_USER: usersystem
+      POSTGRES_PASSWORD: passreserv
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U usersystem -d reservsystem" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:latest
+    container_name: restaurant_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile-backend
+    container_name: restaurant_backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/reservsystem
+      SPRING_DATASOURCE_USERNAME: usersystem
+      SPRING_DATASOURCE_PASSWORD: passreserv
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./RestaurantBookSystem:/app  # backend code
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile-frontend
+    container_name: restaurant_frontend
+    ports:
+      - "8081:80"
+    volumes:
+      - ./RestaurantFrontEndSystem/html:/usr/share/nginx/html  # frontend files
+    networks:
+      - app-network
+
+volumes:
+  postgres-data:
+
+networks:
+  app-network:
+    driver: bridge

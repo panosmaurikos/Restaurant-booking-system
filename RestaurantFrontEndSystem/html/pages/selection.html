@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reservation System</title>
+    <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"
+    />
+    <link rel="stylesheet" type="text/css" href="/css/selection.css" />
+    <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  </head>
+  <body>
+    <div class="header">
+      <div class="letter">Restaurant Reservation System</div>
+      <div class="header-buttons">
+        <button id="login-btn" onclick="location.href='/pages/login.html'">
+          Login
+        </button>
+        <button
+          id="register-btn"
+          onclick="location.href='/pages/register.html'"
+        >
+          Register
+        </button>
+        <div class="welcome_logout">
+          <span id="welcome-message" style="padding-right: 20px"></span>
+          <button id="logout-btn" style="display: none">Logout</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="container correct">
+      <!-- People Selection -->
+      <div class="section">
+        <h2>Select people</h2>
+        <select id="people">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+        </select>
+      </div>
+
+      <!-- Time Selection -->
+      <div class="section">
+        <h2>Select Time</h2>
+        <input type="time" id="time" />
+      </div>
+
+      <!-- Calendar (Always Visible) -->
+      <div class="section">
+        <h2>Select Date</h2>
+        <div class="calendar-container">
+          <div id="calendar" class="calendar"></div>
+        </div>
+      </div>
+
+      <!-- Table Selection -->
+      <div class="section">
+        <h2>Select a Table</h2>
+        <div
+          id="container"
+          style="border: 1px solid #ccc; margin: 20px 0; height: 550px"
+        ></div>
+      </div>
+
+      <!-- Next Step Button -->
+      <button id="nextPageBtn" class="next-page-btn">Go to form</button>
+    </div>
+    <div class="footer">
+      <p>&copy; 2025 Restaurant Reservation System. All rights reserved.</p>
+      
+      <p>
+        By registering, you agree to our <a href="/pages/terms.html">Terms</a> and
+        <a href="/pages/reservation-policy.html">Privacy Policy</a>.
+      </p>
+    </div>
+    <script src="/scripts/selection.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        flatpickr("#calendar", {
+          inline: true,
+          dateFormat: "Y-m-d",
+          minDate: "today",
+        });
+
+        const nextPageBtn = document.getElementById("nextPageBtn");
+        window.addEventListener("scroll", function () {
+          if (
+            window.innerHeight + window.scrollY >=
+            document.body.offsetHeight
+          ) {
+            nextPageBtn.style.display = "block";
+          } else {
+            nextPageBtn.style.display = "none";
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

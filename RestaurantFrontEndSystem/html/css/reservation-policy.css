@@ -1,0 +1,103 @@
+/* Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: cursive, sans-serif;
+    background-color: #f7e0b6;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header */
+.header {
+    background: #b25c2a;
+    padding: 20px;
+    text-align: center;
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.header .letter {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: white;
+}
+
+/* Main Content */
+.main-content {
+    background-color: #6b5840;
+    padding: 20px;
+    border-radius: 15px;
+    color: white;
+    margin-bottom: 20px;
+}
+
+.content-box {
+    background-color: #574934;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.content-box h2 {
+    color: #b25c2a;
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+}
+
+.content-box p {
+    font-size: 1rem;
+    margin-bottom: 15px;
+    line-height: 1.6;
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    padding: 20px;
+    background-color: #6b5840;
+    color: white;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.footer p {
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+
+    .header {
+        font-size: 20px;
+    }
+
+    .content-box {
+        padding: 15px;
+    }
+
+    .content-box h2 {
+        font-size: 1.3rem;
+    }
+
+    .content-box p {
+        font-size: 0.9rem;
+    }
+}

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reservation Verification</title>
+    <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
+
+    <style>
+      body {
+        font-family: cursive, sans-serif;
+        background-color: #f7e0b6;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        margin: 0;
+      }
+      .header {
+        background: #b25c2a;
+        width: 100%;
+        padding: 15px;
+        text-align: center;
+        color: white;
+        font-size: 24px;
+        font-weight: bold;
+        position: absolute;
+        top: 0;
+      }
+      .reservation-details {
+        background: #6b5840;
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        margin-top: 10px;
+        width: 400px;
+        text-align: center;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+      }
+      .logo {
+        width: 500px;
+        margin-top: 80px;
+        display: block;
+      }
+      /* Center the QR code container */
+      #qrcode {
+        justify-items: center;
+        margin: auto;
+        padding: 5px;
+        background-color: #f9f9f9;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        max-width: fit-content;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div class="header">Reservation Verification</div>
+    <img
+            class="logo"
+            src="/images/Screenshot 2025-02-03 220219.png"
+            alt="Restaurant Logo"
+    />
+
+    <div class="reservation-details" id="reservationDetails">
+      <h2>Reservation Confirmed!</h2>
+      <p><strong>Reservation ID</strong> </br><span id="reservationId"></span></p>
+      <p><strong>Table Number:</strong> <span id="tableNumber"></span></p>
+      <p><strong>People:</strong> <span id="people"></span></p>
+      <p><strong>Name:</strong> <span id="name"></span></p>
+      <p><strong>Surname:</strong> <span id="surname"></span></p>
+      <p><strong>Date:</strong> <span id="date"></span></p>
+      <p><strong>Time:</strong> <span id="time"></span></p>
+      <p><strong>Phone:</strong> <span id="phone"></span></p>
+      <p><strong>Email:</strong> <span id="email"></span></p>
+      <p><strong>Notes</strong> </br><span id="notes"></span></p>
+      <div id="qrcode"></div> <!-- QR code will be rendered here -->
+      <p>You must show it at entrance!</p>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script type="text/javascript">
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const resId = urlParams.get('reservationId');
+      let reservationId;
+      let reservation = {};
+
+      loadReservation(resId);
+
+
+      async function loadReservation(resId) {
+        try {
+          const response = await fetch(
+                  `http://localhost:8080/api/reservation/completed/${resId}`,
+                  {
+                    method: "GET",
+                    headers: { "Content-Type": "application/json" },
+                  }
+          );
+          if (!response.ok) {
+            console.log("Failed to find this reservation");
+            window.location.href = `/pages/selection.html`;
+          }
+          const data = await response.json();
+
+          if (data.isCompleted == true){
+            window.location.href = `/pages/selection.html`;
+          }
+
+          reservation = {
+            id: data.id,
+            tableNumber: data.tableNumber,
+            people: data.people,
+            name: data.name,
+            surname: data.surname,
+            date: data.date,
+            time: data.time,
+            phone: data.phone,
+            email: data.email,
+            notes: data.notes,
+          };
+          await validateReservation();
+        } catch (error) {
+          console.error("Error fetching reservations:", error);
+          window.location.href = `/pages/selection.html`;
+        }
+      }
+
+      async function validateReservation() {
+
+        if(reservation.id){
+          new QRCode(document.getElementById("qrcode"), {
+            text: `http://localhost:8081/pages/verification.html?reservationId=${reservation.id}`,
+            width: 150,
+            height: 150,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H, // High error correction
+          });
+
+          try{
+            const emailResponse = await fetch(
+                    `http://localhost:8080/api/reservation/send-verification-email/${reservation.id}`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                    }
+            );
+            if (!emailResponse.ok) {
+              const errorText = await emailResponse.text();
+              console.error("Failed to send verification email:", errorText);
+            } else {
+              console.log("Verification email sent successfully!");
+            }
+          }catch (error) {
+            console.error("Error loading reservation or sending email:", error);
+            alert("Failed to load reservation details or send email. Please try again.");
+          }
+        }
+
+        document.getElementById("reservationId").textContent = reservation.id;
+        document.getElementById("tableNumber").textContent = reservation.tableNumber;
+        document.getElementById("people").textContent = reservation.people;
+        document.getElementById("name").textContent = reservation.name;
+        document.getElementById("surname").textContent = reservation.surname;
+        document.getElementById("date").textContent = reservation.date;
+        document.getElementById("time").textContent = reservation.time;
+        document.getElementById("phone").textContent = reservation.phone;
+        document.getElementById("email").textContent = reservation.email;
+        document.getElementById("notes").textContent = reservation.notes || "None";
+      }
+    </script>
+  </body>
+</html>

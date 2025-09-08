@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manager - Reservations</title>
+    <link rel="stylesheet" href="/css/manager_dash.css" />
+    <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
+    <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Sidebar Menu -->
+      <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <button id="menuToggle" class="menu-toggle">☰</button>
+          <span id="welcome-message" class="welcome-text"></span>
+        </div>
+        <nav class="sidebar-nav">
+          <a href="#" class="nav-item active" data-page="reservations">
+            <span class="icon">📋</span>
+            <span class="text">Reservations</span>
+          </a>
+          <a href="#" class="nav-item" data-page="tables">
+            <span class="icon">🪑</span>
+            <span class="text">Available Tables</span>
+          </a>
+          <a href="#" class="nav-item" data-page="completed">
+            <span class="icon">✓</span>
+            <span class="text">Completed</span>
+          </a>
+          <a href="#" class="nav-item" data-page="manage">
+            <span class="icon">⚙️</span>
+            <span class="text">Manage Users</span>
+          </a>
+        </nav>
+
+        <!-- Profile and Logout at the bottom of the sidebar -->
+        <div class="sidebar-footer">
+          <a href="#" class="nav-item" data-page="profile">
+            <span class="icon">👤</span>
+            <span class="text">Profile</span>
+          </a>
+          <a href="#" class="nav-item" onclick="logout()">
+            <span class="icon">🚪</span>
+            <span class="text">Logout</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="main-content" id="mainContent"></div>
+      <!-- Update Modal -->
+      <div id="updateModal" class="modal">
+        <div class="modal-content">
+          <span class="close">&times;</span>
+          <p>
+            Update reservation with ID: <span id="updateReservationId"></span>
+          </p>
+          <div>
+            <form id="updateReservationForm">
+              <label for="updateTableNumber">Table Number</label>
+              <input
+                type="text"
+                id="updateTableNumber"
+                name="tableNumber"
+                required
+              />
+
+              <label for="updatePeople">Number of People</label>
+              <input type="text" id="updatePeople" name="people" />
+
+              <label for="updateSurname">Surname</label>
+              <input type="text" id="updateSurname" name="surname" />
+
+              <label for="updateName">Name</label>
+              <input
+                type="text"
+                id="updateName"
+                autocomplete="on"
+                name="name"
+              />
+
+              <label for="updatePhone">Phone</label>
+              <input
+                type="tel"
+                id="updatePhone"
+                autocomplete="on"
+                name="phone"
+              />
+
+              <label for="updateEmail">Email</label>
+              <input
+                type="email"
+                id="updateEmail"
+                autocomplete="on"
+                name="email"
+              />
+
+              <label for="updateNotes">Notes</label>
+              <textarea id="updateNotes" name="notes" rows="3"></textarea>
+
+              <label for="updateDate">Date</label>
+              <input type="date" id="updateDate" name="date" />
+
+              <label for="updateTime">Time</label>
+              <input type="time" id="updateTime" name="time" />
+            </form>
+          </div>
+          <button class="special-btn" id="confirmUpdate">Confirm Update</button>
+        </div>
+      </div>
+      <!-- Cancel Modal -->
+      <div id="cancelModal" class="modal">
+        <div class="modal-content">
+          <span class="close">&times;</span>
+          <p>
+            Are you sure you want to cancel reservation with ID:
+            <span id="cancelReservationId"></span>?
+          </p>
+          <button class="special-btn" id="confirmCancel">Confirm Cancel</button>
+        </div>
+      </div>
+      <!-- Manage User -->
+      <div id="editModal" class="modal">
+        <div class="modal-content">
+          <span class="close">&times;</span>
+          <p>
+            Update User with ID: <span id="updateUserId"></span>
+          </p>
+          <div>
+            <form id="editUser">
+              <label for="updateUsername">Username</label>
+              <input type="text" id="updateUsername" name="username" />
+
+              <label for="updateEmail">Email</label>
+              <input type="email" id="updateUserEmail" autocomplete="on" name="email"/>
+
+              <label for="updateUserDate">Date</label>
+              <input type="date" id="updateUserDate" name="date" />
+
+              <label for="updateUserRole">Role</label>
+              <input type="text" id="updateUserRole" name="role" />
+            </form>
+          </div>
+          <button class="special-btn" id="confirmEdit">Confirm</button>
+        </div>
+      </div>
+    </div>
+    <script src="/scripts/manager_dash.js"></script>
+  </body>
+</html>

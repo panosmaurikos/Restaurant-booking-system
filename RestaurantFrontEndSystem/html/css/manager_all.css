@@ -1,0 +1,205 @@
+body {
+  font-family: cursive, sans-serif;
+  background-color: #f7e0b6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+}
+.header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  background: #b25c2a;
+  width: 100%;
+  padding: 15px;
+  text-align: center;
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  position: fixed;
+  top: 0;
+}
+.user-info {
+  right: 20px;
+  top: 15px;
+  color: white;
+}
+.letter {
+  padding-left: 20px;
+}
+.logout-btn {
+  background: #6b5840;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: bold;
+  max-width: max-content;
+}
+
+.logo {
+  margin-top: 50px;
+  width: 450px;
+  display: block;
+}
+.filter-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #6b5840;
+  padding-bottom: 20px;
+  border-radius: 10px;
+  gap: 5px;
+  color: white;
+  width: 60%; /* Adjust as needed */
+  margin-top: 20px;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 2 columns */
+  grid-template-rows: repeat(2, auto); /* 3 rows */
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.filter-group label {
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.filter-group input {
+  width: 50%;
+  padding: 8px;
+  border-radius: 5px;
+  border: none;
+}
+
+#applyFiltersBtn {
+  margin-top: 20px;
+  width: 100%;
+  max-width: 200px;
+}
+.table-wrapper {
+  border-radius: 6px; /* Adjust the radius as needed */
+  overflow: hidden; /* Ensures the table corners are clipped */
+  margin-top: 50px;
+  width: 70%;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Optional: Adds a shadow for better visual effect */
+}
+
+.reservations-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+}
+
+.reservations-table th,
+.reservations-table td {
+  padding: 10px;
+  border: 1px solid #6b5840;
+}
+
+.reservations-table th {
+  background: #b25c2a;
+  color: white;
+}
+
+/* Apply border radius to the first and last cells in the first row */
+.reservations-table tr:first-child th:first-child {
+  border-top-left-radius: 6px;
+}
+
+.reservations-table tr:first-child th:last-child {
+  border-top-right-radius: 6px;
+}
+
+/* Apply border radius to the first and last cells in the last row */
+.reservations-table tr:last-child td:first-child {
+  border-bottom-left-radius: 6px;
+}
+
+.reservations-table tr:last-child td:last-child {
+  border-bottom-right-radius: 6px;
+}
+/* Modal Styles */
+.modal {
+  display: none; /* Hidden by default */
+  position: fixed; /* Stay in place */
+  z-index: 1; /* Sit on top */
+  left: 0;
+  top: 0;
+  width: 100%; /* Full width */
+  height: 100%; /* Full height */
+  overflow: auto; /* Enable scroll if needed */
+  background-color: rgba(0, 0, 0, 0.4); /* Black w/ opacity */
+}
+
+.modal-content {
+  background-color: #fefefe;
+  margin: 10% auto; /* 15% from the top and centered */
+  padding: 20px;
+  border: 1px solid #888;
+  border-radius: 10px;
+  width: 70%; /* Could be more or less, depending on screen size */
+}
+
+.close {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+}
+
+.close:hover,
+.close:focus {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: bold;
+}
+#updateReservationForm {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 10px;
+  font-size: larger;
+  padding-bottom: 40px;
+}
+input {
+  border: 1px solid #888;
+  border-radius: 5px;
+  width: 30%;
+  text-align: center;
+  padding: 10px;
+}
+p {
+  text-align: center;
+  font-size: larger;
+  font-weight: bold;
+  padding-bottom: 20px;
+}
+textarea {
+  border: 1px solid #888;
+  border-radius: 5px;
+  width: 30%;
+  text-align: center;
+  padding: 10px;
+}
+.footer {
+  margin-top: 20px;
+  font-size: 12px;
+  color: #6b5840;
+  text-align: center;
+  width: 100%;
+  padding: 10px;
+}

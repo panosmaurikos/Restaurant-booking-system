@@ -1,0 +1,4 @@
+# Dockerfile-frontend
+FROM nginx:latest
+COPY RestaurantFrontEndSystem/html /usr/share/nginx/html
+EXPOSE 80

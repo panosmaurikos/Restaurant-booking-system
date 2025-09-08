@@ -1,0 +1,132 @@
+body {
+  font-family: cursive, sans-serif;
+  background-color: #f7e0b6;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+  flex-direction: column;
+}
+.header {
+  background: #b25c2a;
+  width: 100%;
+  padding: 15px;
+  text-align: center;
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+.letter {
+  padding-left: 20px;
+}
+.header-buttons {
+  display: flex;
+  gap: 10px;
+}
+#login-btn{
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+#register-btn{
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+.welcome_logout {
+  display: flex;
+  padding-right: 20px;
+}
+.birth {
+  display: none;
+}
+.isConnected {
+  display: none;
+}
+.header-buttons button {
+  background: #6b5840;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.header-buttons button:hover {
+  background: #8a4820;
+}
+.logo {
+  width: 500px;
+  display: block;
+}
+.reservation-container {
+  background: #6b5840;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  color: white;
+  width: 400px;
+}
+.reservation-container h2 {
+  margin-bottom: 10px;
+}
+.input-field {
+  width: 80%;
+  padding: 10px;
+  margin: 10px 0;
+  border: none;
+  border-radius: 10px;
+}
+#confirmForm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.reserve-btn {
+  background: #b25c2a;
+  color: white;
+  border: none;
+  margin-top: 20px;
+  padding: 12px;
+  border-radius: 25px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  width: 90%;
+  font-size: 16px;
+  font-weight: bold;
+}
+.reserve-btn:hover {
+  background: #8a4820;
+  transform: scale(1.02) perspective(1px);
+}
+.previous {
+  background: #b25c2a;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+.previous:hover {
+  transform: scale(1.02) perspective(1px);
+}
+
+.footer {
+  margin-top: 50px;
+  font-size: 12px;
+  color: #6b5840;
+  text-align: center;
+  width: 100%;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
