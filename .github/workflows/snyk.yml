@@ -1,0 +1,77 @@
+name: DevSecOps - Snyk
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  snyk-code-and-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Debug SNYK_TOKEN
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "❌ SNYK_TOKEN is empty"
+          else
+            echo "✅ SNYK_TOKEN is set"
+          fi
+
+      - name: Run Snyk test (dependencies)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/project \
+            -w /project \
+            -e SNYK_TOKEN=$SNYK_TOKEN \
+            snyk/snyk:docker snyk test --sarif-file-output=snyk-deps.sarif
+
+      - name: Run Snyk code test (SAST)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/project \
+            -w /project \
+            -e SNYK_TOKEN=$SNYK_TOKEN \
+            snyk/snyk:docker snyk code test --sarif-file-output=snyk-code.sarif
+
+      - name: Upload SARIF results (dependencies)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-deps.sarif
+
+      - name: Upload SARIF results (code)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-code.sarif
+
+  snyk-container:
+    runs-on: ubuntu-latest
+    needs: snyk-code-and-deps
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t smart-tourism-app .
+
+      - name: Run Snyk container test
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e SNYK_TOKEN=$SNYK_TOKEN \
+            snyk/snyk:docker snyk container test smart-tourism-app --file=Dockerfile --sarif-file-output=snyk-container.sarif
+
+      - name: Upload SARIF results (container)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-container.sarif
