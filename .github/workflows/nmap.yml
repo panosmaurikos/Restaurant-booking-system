@@ -35,57 +35,87 @@ jobs:
           docker compose logs
           exit 1
 
-      - name: Run Nmap scan
+      - name: Run comprehensive Nmap security scan
         run: |
-          docker run --network=host instrumentisto/nmap -sS -sV -sC -O -T4 -v -p- -oX nmap-full-scan.xml -oN nmap-full-scan.txt 
+            # Create a directory for nmap results
+            mkdir -p nmap-results
+            
+            # Run nmap with volume mounting
+            docker run --network=host \
+            -v $(pwd)/nmap-results:/results \
+            instrumentisto/nmap \
+            -sS -sV -sC -O -T4 -v -p- \
+            -oX /results/nmap-full-scan.xml \
+            -oN /results/nmap-full-scan.txt \
+            localhost
+
       - name: List scan files
         run: ls -l
       - name: Verify scan files were created
         run: |
             echo "=== Checking for scan files ==="
-            ls -la
-            if [ -f "nmap-full-scan.xml" ] && [ -f "nmap-full-scan.txt" ]; then
+            ls -la nmap-results/
+            
+            if [ -f "nmap-results/nmap-full-scan.xml" ] && [ -f "nmap-results/nmap-full-scan.txt" ]; then
             echo "✅ Scan files created successfully!"
-            echo "XML file size: $(wc -l < nmap-full-scan.xml) lines"
-            echo "TXT file size: $(wc -l < nmap-full-scan.txt) lines"
+            echo "XML file size: $(wc -l < nmap-results/nmap-full-scan.xml) lines"
+            echo "TXT file size: $(wc -l < nmap-results/nmap-full-scan.txt) lines"
+            
+            # Copy files to root for easier access
+            cp nmap-results/* .
             else
-            echo "❌ Scan files NOT found! Something went wrong with the nmap scan."
+            echo "❌ Scan files NOT found in nmap-results directory!"
+            echo "Contents of nmap-results:"
+            ls -la nmap-results/
             exit 1
             fi
-            
-      - name: Generate beautiful HTML reports
-        run: |
-          # Install required tools
-          sudo apt-get update
-          sudo apt-get install -y xsltproc pandoc curl
 
-          # Generate standard HTML report
-          if [ -f "/usr/share/nmap/nmap.xsl" ]; then
-            xsltproc -o nmap-standard.html /usr/share/nmap/nmap.xsl nmap-full-scan.xml localhost
-          else
+      - name: Generate HTML reports
+        run: |
+            # Install required tools
+            sudo apt-get install -y xsltproc pandoc curl
+
+            echo "=== Generating HTML reports ==="
+            
+            # Generate standard HTML report
             curl -s https://svn.nmap.org/nmap/docs/nmap.xsl -o nmap.xsl
             xsltproc -o nmap-standard.html nmap.xsl nmap-full-scan.xml
-          fi
 
-          # Create beautiful summary report
-          cat > nmap-summary.md << 'EOF'
-            #  Nmap Security Scan Report
+            # Create simple summary
+            echo "# Nmap Scan Report" > summary.md
+            echo "## Scan date: $(date)" >> summary.md
+            echo "## Target: localhost" >> summary.md
+            echo "## Open ports:" >> summary.md
+            echo '```' >> summary.md
+            grep "open" nmap-full-scan.txt | sort -n >> summary.md
+            echo '```' >> summary.md
 
-            ##  Scan Details
-            - **Date**: $(date)
-            - **Target**: localhost
-            - **Scan Type**: Comprehensive Security Scan (-sS -sV -sC -O)
+            # Convert to HTML
+            pandoc summary.md -o summary.html
 
-            ##  Scan Results Summary
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+            name: nmap-reports
+            path: |
+              nmap-full-scan.xml
+              nmap-full-scan.txt
+              nmap-standard.html
+              summary.md
+              summary.html
 
-            ###  Open Ports Found
-            ```bash
-            $(grep "open" nmap-full-scan.txt | sort -n | head -20)
-            ```
-          EOF
-
-          # Convert markdown summary to HTML
-          pandoc nmap-summary.md -o nmap-summary.html
+      - name: Show quick results
+        run: |
+            echo "📊 Nmap Scan Results:"
+            echo "======================"
+            if [ -f "nmap-full-scan.txt" ]; then
+            echo "Open ports found:"
+            grep "open" nmap-full-scan.txt | sort -n
+            echo ""
+            echo "Total open ports: $(grep -c 'open' nmap-full-scan.txt)"
+            else
+            echo "No results available - scan may have failed"
+            fi
 
       - name: Stop services
         run: docker compose -f docker-compose.yml down
