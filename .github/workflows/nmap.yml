@@ -37,10 +37,36 @@ jobs:
 
       - name: Run Nmap scan
         run: |
-          sudo apt-get update
-          sudo apt-get install -y nmap
-          nmap -p 5432,6379,8080,8081 localhost
+          docker run --network=host instrumentisto/nmap -sS -sV -sC -O -T4 -v -p- -oX nmap-full-scan.xml -oN nmap-full-scan.txt localhost
 
+      - name: Generate beautiful HTML reports
+        run: |
+            # Install required tools
+            sudo apt-get update
+            sudo apt-get install -y xsltproc pandoc curl
+
+            # Generate standard HTML report
+            if [ -f "/usr/share/nmap/nmap.xsl" ]; then
+            xsltproc -o nmap-standard.html /usr/share/nmap/nmap.xsl nmap-report.xml
+            else
+            curl -s https://svn.nmap.org/nmap/docs/nmap.xsl -o nmap.xsl
+            xsltproc -o nmap-standard.html nmap.xsl nmap-report.xml
+            fi
+
+            # Create beautiful summary report
+            cat > nmap-summary.md << 'EOF'
+            # 🛡️ Nmap Security Scan Report
+
+            ## 📅 Scan Details
+            - **Date**: $(date)
+            - **Target**: localhost
+            - **Scan Type**: Comprehensive Security Scan (-sS -sV -sC -O)
+
+            ## 📊 Scan Results Summary
+
+            ### 🚪 Open Ports Found
+            ```bash
+            $(grep "open" nmap-report.txt | sort -n | head -20)
 
       - name: Stop services
         run: docker compose -f docker-compose.yml down
