@@ -37,8 +37,9 @@ jobs:
 
       - name: Run Nmap scan
         run: |
-          docker run --network=host instrumentisto/nmap -sS -sV -sC -O -T4 -v -p- -oX nmap-full-scan.xml -oN nmap-full-scan.txt localhost
-
+          docker run --network=host instrumentisto/nmap -sS -sV -sC -O -T4 -v -p- -oX nmap-full-scan.xml -oN nmap-full-scan.txt 
+      - name: List scan files
+        run: ls -l
       - name: Generate beautiful HTML reports
         run: |
           # Install required tools
