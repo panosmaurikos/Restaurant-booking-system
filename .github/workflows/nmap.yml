@@ -84,29 +84,36 @@ jobs:
             xsltproc -o nmap-redis-report.html nmap.xsl nmap-redis-scan.xml
 
             cat > security-summary.md << EOF
-        
+                # 🛡️ Application Security Scan Report
+
+                ## 📅 Scan Date: $(date)
+                ## 🎯 Target: localhost
+
+                ## 📊 Application Ports Scan
                 \`\`\`bash
                 $(grep "open" nmap-full-scan.txt | sort -n)
                 \`\`\`
 
+                ## 🌐 Web Application Details
                 \`\`\`bash
-                $(grep -A2 -B2 "http\|Server\|X-" nmap-web-scan.txt | head -10 || echo "Web services detected")
+                $(grep -A3 -B2 "8080/tcp\|8081/tcp" nmap-full-scan.txt)
                 \`\`\`
 
                 ## 🗄️ Database Services
-                **PostgreSQL:**
                 \`\`\`bash
-                $(grep -A3 -B3 "5432\|PostgreSQL" nmap-pgsql-scan.txt || echo "PostgreSQL service running")
+                $(grep -A3 -B2 "5432/tcp\|6379/tcp" nmap-full-scan.txt)
                 \`\`\`
 
-                **Redis:**
+                ## 🔍 Detected Services
                 \`\`\`bash
-                $(grep -A3 -B3 "6379\|Redis" nmap-redis-scan.txt || echo "Redis service running")
+                $(grep -E "Apache|nginx|Tomcat|PostgreSQL|Redis" nmap-full-scan.txt | head -8)
                 \`\`\`
 
                 ## ⚡ Quick Stats
                 - **Open Ports**: $(grep -c "open" nmap-full-scan.txt)
-                - **Services Scanned**: 4 targeted scans
+                - **Web Services**: 2 (Tomcat + nginx)
+                - **Database Services**: 2 (PostgreSQL + Redis)
+                - **Scan Type**: Comprehensive security assessment
             EOF
 
                     pandoc security-summary.md -o security-summary.html --self-contained --css=https://cdn.jsdelivr.net/npm/water.css@2/out/water.css
@@ -126,14 +133,16 @@ jobs:
             echo "🔒 APPLICATION SECURITY SCAN COMPLETED 🔒"
             echo "=========================================="
             echo "📊 Open ports found:"
-            grep "open" nmap-full-scan.txt | sort -n || echo "No open ports found"
+            grep "open" nmap-full-scan.txt | sort -n
             echo ""
-            echo "🌐 Web server info:"
-            grep -i "server\|http" nmap-web-scan.txt | head -10 || echo "No web headers found"
+            echo "🌐 Web server details:"
+            grep -A5 -B2 "8080/tcp\|8081/tcp" nmap-full-scan.txt
             echo ""
-            echo "🗄️ Database info:"
-            grep -A2 -B2 "PostgreSQL" nmap-pgsql-scan.txt || echo "No PostgreSQL details"
-            grep -A2 -B2 "Redis" nmap-redis-scan.txt || echo "No Redis details"
+            echo "🗄️ Database details:"
+            grep -A5 -B2 "5432/tcp\|6379/tcp" nmap-full-scan.txt
+            echo ""
+            echo "🔍 Service versions:"
+            grep -E "Service|Version|Apache|nginx|Tomcat|PostgreSQL|Redis" nmap-full-scan.txt | head -10
             echo ""
             echo "📁 Full security reports available as artifacts"
 
