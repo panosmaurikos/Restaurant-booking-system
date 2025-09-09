@@ -1,30 +1,42 @@
-name: DevSecOps Orchestrator
+name: 🛡️ DevSecOps Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [ main, master ]
   pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: 
 
 permissions:
   contents: read
-  id-token: write
-  issues: write
-  pull-requests: write
   security-events: write
+  actions: read
 
 jobs:
+
   trufflehog:
+    name:  Secrets Scanning (TruffleHog)
     uses: ./.github/workflows/trufflehog.yml
+
+ 
   snyk:
+    name:  Code Security (Snyk)
     uses: ./.github/workflows/snyk.yml
     secrets:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  
   nmap:
+    name:  Network Security (Nmap)
     uses: ./.github/workflows/nmap.yml
+
+
   sonarqube:
+    name:  Code Quality (SonarQube)
     uses: ./.github/workflows/sonarqube.yml
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  
-  
-  
+
+  dependabot:
+    name:  Dependency Scanning
+    uses: ./.github/workflows/dependabot.yml
