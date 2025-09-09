@@ -1,9 +1,8 @@
 name: DevSecOps - SonarQube
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
+  workflow_call:
+ 
 
 jobs:
   sonarqube-analysis:
@@ -42,7 +41,7 @@ jobs:
       - name: Run SonarQube scan for backend (Maven project)
         env:
           SONAR_HOST_URL: http://localhost:9000
-          SONAR_TOKEN: ${{ secrets.GithubTokenSonar }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           cd RestaurantBookSystem
           mvn -B -DskipTests verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
@@ -54,7 +53,7 @@ jobs:
       - name: Run SonarQube scan for frontend (JS/HTML)
         env:
           SONAR_HOST_URL: http://localhost:9000
-          SONAR_TOKEN: ${{ secrets.GithubTokenSonar }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           cd RestaurantFrontEndSystem
           sonar-scanner \
