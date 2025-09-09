@@ -126,13 +126,14 @@ jobs:
             echo "🔒 APPLICATION SECURITY SCAN COMPLETED 🔒"
             echo "=========================================="
             echo "📊 Open ports found:"
-            grep "open" nmap-app-scan.txt | sort -n
+            grep "open" nmap-full-scan.txt | sort -n || echo "No open ports found"
             echo ""
             echo "🌐 Web server info:"
-            grep -i "server\|http" nmap-web-scan.txt | head -5
+            grep -i "server\|http" nmap-web-scan.txt | head -10 || echo "No web headers found"
             echo ""
             echo "🗄️ Database info:"
-            grep -A2 -B2 "Redis\|PostgreSQL" nmap-pgsql-scan.txt nmap-redis-scan.txt 2>/dev/null | head -5 || echo "Database services running"
+            grep -A2 -B2 "PostgreSQL" nmap-pgsql-scan.txt || echo "No PostgreSQL details"
+            grep -A2 -B2 "Redis" nmap-redis-scan.txt || echo "No Redis details"
             echo ""
             echo "📁 Full security reports available as artifacts"
 
