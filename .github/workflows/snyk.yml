@@ -25,7 +25,12 @@ jobs:
           else
             echo "✅ SNYK_TOKEN is set"
           fi
-
+      - name: Make mvnw executable (if present)
+        run: |
+          if [ -f RestaurantBookSystem/mvnw ]; then
+            chmod +x RestaurantBookSystem/mvnw
+            ls -l RestaurantBookSystem/mvnw
+          fi
       - name: Run Snyk test (dependencies)
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
