@@ -10,6 +10,7 @@ permissions:
   contents: read
   security-events: write
 
+
 jobs:
   sonarqube:
     runs-on: ubuntu-latest
@@ -112,7 +113,52 @@ jobs:
           echo "Saved Sonar results:"
           ls -la sonar-*.json || true
 
-      - name: Upload Sonar results as artifact
+      - name: Print Sonar JSON reports to job log
+        run: |
+          echo "=== SONAR ISSUES ==="
+          jq --color-output '.' sonar-issues.json || echo "no sonar-issues.json"
+          echo
+          echo "=== SONAR MEASURES ==="
+          jq --color-output '.' sonar-measures.json || echo "no sonar-measures.json"
+          echo
+          echo "=== SONAR PROJECT ==="
+          jq --color-output '.' sonar-project.json || echo "no sonar-project.json"
+
+      - name: Generate human-readable Markdown summary
+        run: |
+          PROJECT_KEY="restaurant-backend"
+          echo "# SonarQube Report — ${PROJECT_KEY}" > sonar-summary.md
+          echo "" >> sonar-summary.md
+          echo "Generated: $(date)" >> sonar-summary.md
+          echo "" >> sonar-summary.md
+          echo "## Key Measures" >> sonar-summary.md
+          if [ -f sonar-measures.json ]; then
+            jq -r '.component.measures[] | "- **\(.metric)**: \(.value)"' sonar-measures.json >> sonar-summary.md || true
+          else
+            echo "_No measures file found_" >> sonar-summary.md
+          fi
+          echo "" >> sonar-summary.md
+          echo "## Issues by severity" >> sonar-summary.md
+          if [ -f sonar-issues.json ]; then
+            jq -r '.issues[]?.severity' sonar-issues.json 2>/dev/null | sort | uniq -c | awk '{print "- "$2": "$1}' >> sonar-summary.md || echo "- none" >> sonar-summary.md
+          else
+            echo "_No issues file found_" >> sonar-summary.md
+          fi
+          echo "" >> sonar-summary.md
+          echo "## Top issues (first 10)" >> sonar-summary.md
+          if [ -f sonar-issues.json ]; then
+            jq -r '.issues[] | "- **" + (.severity // "-") + "**: " + (.message // "") + " _(file: " + (.component // "n/a") + ")_"' sonar-issues.json | head -n 10 >> sonar-summary.md || true
+          fi
+
+      - name: Convert Markdown summary to HTML
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y pandoc
+          if [ -f sonar-summary.md ]; then
+            pandoc sonar-summary.md -o sonar-summary.html || true
+          fi
+
+      - name: Upload Sonar results and summary as artifact
         uses: actions/upload-artifact@v4
         with:
           name: sonar-report
@@ -120,3 +166,5 @@ jobs:
             sonar-issues.json
             sonar-measures.json
             sonar-project.json
+            sonar-summary.md
+            sonar-summary.html
