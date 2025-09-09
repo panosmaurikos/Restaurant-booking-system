@@ -17,10 +17,14 @@ jobs:
     uses: ./.github/workflows/trufflehog.yml
   snyk:
     uses: ./.github/workflows/snyk.yml
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
   nmap:
     uses: ./.github/workflows/nmap.yml
   sonarqube:
     uses: ./.github/workflows/sonarqube.yml
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   
   
   
