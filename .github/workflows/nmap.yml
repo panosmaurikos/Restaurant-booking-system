@@ -61,21 +61,19 @@ jobs:
             -oN /results/nmap-web-scan.txt \
             localhost
 
-            # PostgreSQL security check
             docker run --network=host \
             -v $(pwd)/nmap-results:/results \
             instrumentisto/nmap \
-            --script pgsql-info \
+            --script pgsql-brute \  
             -p 5432 \
             -oX /results/nmap-pgsql-scan.xml \
             -oN /results/nmap-pgsql-scan.txt \
             localhost
 
-            # Redis security check
             docker run --network=host \
             -v $(pwd)/nmap-results:/results \
             instrumentisto/nmap \
-            --script redis-info \
+            --script redis-info \  # Αυτό είναι το σωστό όνομα
             -p 6379 \
             -oX /results/nmap-redis-scan.xml \
             -oN /results/nmap-redis-scan.txt \
