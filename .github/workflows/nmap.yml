@@ -51,33 +51,11 @@ jobs:
 
       - name: Run targeted vulnerability scans
         run: |
-            # Web vulnerability scan
-            docker run --network=host \
-            -v $(pwd)/nmap-results:/results \
-            instrumentisto/nmap \
-            --script vulners,http-enum,http-security-headers \
-            -p 8080,8081 \
-            -oX /results/nmap-web-scan.xml \
-            -oN /results/nmap-web-scan.txt \
-            localhost
+             docker run --network=host -v $(pwd)/nmap-results:/results instrumentisto/nmap --script vulners,http-enum,http-security-headers -p 8080,8081 -oX /results/nmap-web-scan.xml -oN /results/nmap-web-scan.txt localhost
 
-            docker run --network=host \
-            -v $(pwd)/nmap-results:/results \
-            instrumentisto/nmap \
-            --script pgsql-brute \  
-            -p 5432 \
-            -oX /results/nmap-pgsql-scan.xml \
-            -oN /results/nmap-pgsql-scan.txt \
-            localhost
+             docker run --network=host -v $(pwd)/nmap-results:/results instrumentisto/nmap --script pgsql-brute -p 5432 -oX /results/nmap-pgsql-scan.xml -oN /results/nmap-pgsql-scan.txt localhost
 
-            docker run --network=host \
-            -v $(pwd)/nmap-results:/results \
-            instrumentisto/nmap \
-            --script redis-info \  # Αυτό είναι το σωστό όνομα
-            -p 6379 \
-            -oX /results/nmap-redis-scan.xml \
-            -oN /results/nmap-redis-scan.txt \
-            localhost
+             docker run --network=host -v $(pwd)/nmap-results:/results instrumentisto/nmap --script redis-info -p 6379 -oX /results/nmap-redis-scan.xml -oN /results/nmap-redis-scan.txt localhost
 
       - name: Verify scan files were created
         run: |
