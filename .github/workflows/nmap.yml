@@ -77,23 +77,18 @@ jobs:
             sudo apt-get install -y xsltproc pandoc curl
             curl -s https://svn.nmap.org/nmap/docs/nmap.xsl -o nmap.xsl
             
-            xsltproc -o nmap-app-report.html nmap.xsl nmap-app-scan.xml
+            # Χρησιμοποίησε τα ΠΡΑΓΜΑΤΙΚΑ ονόματα αρχείων που υπάρχουν
+            xsltproc -o nmap-full-report.html nmap.xsl nmap-full-scan.xml
             xsltproc -o nmap-web-report.html nmap.xsl nmap-web-scan.xml
             xsltproc -o nmap-pgsql-report.html nmap.xsl nmap-pgsql-scan.xml
             xsltproc -o nmap-redis-report.html nmap.xsl nmap-redis-scan.xml
 
             cat > security-summary.md << EOF
-                # 🛡️ Application Security Scan Report
-
-                ## 📅 Scan Date: $(date)
-                ## 🎯 Target: localhost
-
-                ## 📊 Application Ports Scan
+        
                 \`\`\`bash
-                $(grep "open" nmap-app-scan.txt | sort -n)
+                $(grep "open" nmap-full-scan.txt | sort -n)
                 \`\`\`
 
-                ## 🌐 Web Application Security
                 \`\`\`bash
                 $(grep -A2 -B2 "http\|Server\|X-" nmap-web-scan.txt | head -10 || echo "Web services detected")
                 \`\`\`
@@ -110,7 +105,7 @@ jobs:
                 \`\`\`
 
                 ## ⚡ Quick Stats
-                - **Open Ports**: $(grep -c "open" nmap-app-scan.txt)
+                - **Open Ports**: $(grep -c "open" nmap-full-scan.txt)
                 - **Services Scanned**: 4 targeted scans
             EOF
 
