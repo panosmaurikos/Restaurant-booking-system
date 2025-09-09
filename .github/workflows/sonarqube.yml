@@ -4,34 +4,19 @@ on:
   workflow_call:
     secrets:
       SONAR_TOKEN:
-        required: true
- 
+        required: false  # Δεν είναι υποχρεωτικό αν δημιουργούμε token δυναμικά
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
-  sonarqube-analysis:
+  sonarqube:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Debug SONAR_TOKEN
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          if [ -z "$SONAR_TOKEN" ]; then
-            echo "❌ SONAR_TOKEN is empty"
-          else
-            echo "✅ SONAR_TOKEN is set"
-          fi
-      - name: Start SonarQube in Docker
+      - name: Start SonarQube in Docker and create CI token
         run: |
           docker run -d --name sonarqube \
             -p 9000:9000 \
@@ -46,9 +31,26 @@ jobs:
             sleep 10
           done
 
-      - name: Install SonarScanner CLI
+          # Δημιουργία token μέσω API
+          echo "Generating Sonar token via API..."
+          resp=$(curl -s -u admin:admin -X POST "http://localhost:9000/api/user_tokens/generate" -d "name=ci-token")
+          echo "API response: $resp"
+          SONAR_CI_TOKEN=$(echo "$resp" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          if [ -z "$SONAR_CI_TOKEN" ]; then
+            echo "Failed to create Sonar token. Response:"
+            echo "$resp"
+            exit 1
+          fi
+          echo "Got token, will use it for analysis."
+          echo "SONAR_CI_TOKEN=$SONAR_CI_TOKEN" >> $GITHUB_ENV
+
+      - name: Debug SONAR token
         run: |
-          npm install -g sonar-scanner
+          if [ -z "$SONAR_CI_TOKEN" ] && [ -z "$SONAR_TOKEN" ]; then
+            echo "No token available (SONAR_CI_TOKEN or SONAR_TOKEN)"
+            exit 1
+          fi
+          echo "Using SONAR_CI_TOKEN or secret SONAR_TOKEN"
 
       - name: Run SonarQube scan for backend (Maven project)
         env:
@@ -56,24 +58,9 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           cd RestaurantBookSystem
+          TOKEN="${SONAR_CI_TOKEN:-$SONAR_TOKEN}"
           mvn -B -DskipTests verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
             -Dsonar.projectKey=restaurant-backend \
             -Dsonar.projectName="Restaurant Backend" \
             -Dsonar.host.url=$SONAR_HOST_URL \
-            -Dsonar.login=$SONAR_TOKEN
-
-      - name: Run SonarQube scan for frontend (JS/HTML)
-        env:
-          SONAR_HOST_URL: http://localhost:9000
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          cd RestaurantFrontEndSystem
-          sonar-scanner \
-            -Dsonar.projectKey=restaurant-frontend \
-            -Dsonar.projectName="Restaurant Frontend" \
-            -Dsonar.sources=. \
-            -Dsonar.host.url=$SONAR_HOST_URL \
-            -Dsonar.login=$SONAR_TOKEN
-
-      - name: Stop SonarQube
-        run: docker stop sonarqube && docker rm sonarqube
+            -Dsonar.login="$TOKEN"
