@@ -21,6 +21,11 @@ jobs:
     name:  Secrets Scanning (TruffleHog)
     uses: ./.github/workflows/trufflehog.yml
 
+  semgrep:
+    name: Static Analysis (Semgrep)
+    uses: ./.github/workflows/semgrep.yml
+    secrets:
+      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
  
   snyk:
     name:  Code Security (Snyk)

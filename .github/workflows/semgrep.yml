@@ -1,0 +1,24 @@
+name: Semgrep Static Analysis
+
+on:
+  workflow_call:
+    secrets:
+      SEMGREP_APP_TOKEN:
+        required: true
+
+jobs:
+  semgrep-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Semgrep in Docker
+        run: |
+          docker run --rm \
+            -v "$(pwd):/src" \
+            -e SEMGREP_APP_TOKEN=${{ secrets.SEMGREP_APP_TOKEN }} \
+            semgrep/semgrep:latest \
+            semgrep ci --config=auto --error

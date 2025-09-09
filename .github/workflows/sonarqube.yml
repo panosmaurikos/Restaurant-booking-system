@@ -147,7 +147,6 @@ jobs:
           echo "" >> sonar-summary.md
           echo "## Top issues (first 20)" >> sonar-summary.md
           if [ -f sonar-issues.json ]; then
-            # Αποφεύγουμε το "Broken pipe" κάνοντας redirect σε temp αρχείο και μετά tail/head
             jq -r '.issues[] | "- **" + (.severity // "-") + "**: " + (.message // "") + " _(file: " + (.component // "n/a") + ")_"' sonar-issues.json > top-issues.txt || true
             head -n 20 top-issues.txt >> sonar-summary.md
           fi
