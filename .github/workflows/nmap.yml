@@ -51,31 +51,31 @@ jobs:
 
       - name: Run targeted vulnerability scans
         run: |
-          # Vulnerability scanning ΜΟΝΟ για τα services μας (χωρίς brute force)
-          docker run --network=host \
+            # Web vulnerability scan
+            docker run --network=host \
             -v $(pwd)/nmap-results:/results \
             instrumentisto/nmap \
-            --script "vulners,http-enum,http-security-headers" \
-            -p 8080,8081 \  # ΜΟΝΟ web ports
+            --script vulners,http-enum,http-security-headers \
+            -p 8080,8081 \
             -oX /results/nmap-web-scan.xml \
             -oN /results/nmap-web-scan.txt \
             localhost
 
-          # PostgreSQL security check (χωρίς brute force)
-          docker run --network=host \
+            # PostgreSQL security check
+            docker run --network=host \
             -v $(pwd)/nmap-results:/results \
             instrumentisto/nmap \
-            --script "pgsql-info" \  # Μόνο πληροφορίες, όχι επίθεση
+            --script pgsql-info \
             -p 5432 \
             -oX /results/nmap-pgsql-scan.xml \
             -oN /results/nmap-pgsql-scan.txt \
             localhost
 
-          # Redis security check
-          docker run --network=host \
+            # Redis security check
+            docker run --network=host \
             -v $(pwd)/nmap-results:/results \
             instrumentisto/nmap \
-            --script "redis-info" \  # Μόνο πληροφορίες
+            --script redis-info \
             -p 6379 \
             -oX /results/nmap-redis-scan.xml \
             -oN /results/nmap-redis-scan.txt \
