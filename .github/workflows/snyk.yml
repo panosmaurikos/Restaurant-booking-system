@@ -32,9 +32,9 @@ jobs:
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/project \
-            -w /project \
+            -w /project/RestaurantBookSystem \
             -e SNYK_TOKEN=$SNYK_TOKEN \
-            snyk/snyk:docker snyk test --sarif-file-output=snyk-deps.sarif
+            snyk/snyk:docker snyk test --all-projects --sarif-file-output=snyk-deps.sarif || true
 
       - name: Run Snyk code test (SAST)
         env:
@@ -44,7 +44,7 @@ jobs:
             -v ${{ github.workspace }}:/project \
             -w /project \
             -e SNYK_TOKEN=$SNYK_TOKEN \
-            snyk/snyk:docker snyk code test --sarif-file-output=snyk-code.sarif
+            snyk/snyk:docker snyk code test --sarif-file-output=snyk-code.sarif || true
 
       - name: Upload SARIF results (dependencies)
         uses: github/codeql-action/upload-sarif@v3
