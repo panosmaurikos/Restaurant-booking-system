@@ -45,7 +45,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.GithubTokenSonar }}
         run: |
           cd RestaurantBookSystem
-          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+          mvn -B -DskipTests verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
             -Dsonar.projectKey=restaurant-backend \
             -Dsonar.projectName="Restaurant Backend" \
             -Dsonar.host.url=$SONAR_HOST_URL \

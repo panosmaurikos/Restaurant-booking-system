@@ -15,9 +15,12 @@ permissions:
 jobs:
   trufflehog:
     uses: ./.github/workflows/trufflehog.yml
-
   snyk:
     uses: ./.github/workflows/snyk.yml
-
   nmap:
     uses: ./.github/workflows/nmap.yml
+  sonarqube:
+    uses: ./.github/workflows/sonarqube.yml
+  
+  
+  
