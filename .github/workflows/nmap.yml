@@ -60,6 +60,8 @@ jobs:
       - name: Verify scan files were created
         run: |
           echo "=== Checking for scan files ==="
+          sudo chown -R $USER:$USER nmap-*
+          sudo chmod -R 644 nmap-*
           ls -la nmap-results/
           
           # Copy files to root for easier access
