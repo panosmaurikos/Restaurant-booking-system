@@ -49,41 +49,33 @@ jobs:
             -oN /results/nmap-full-scan.txt \
             localhost
 
-      - name: Run advanced vulnerability scans
+      - name: Run targeted vulnerability scans
         run: |
-          # Vulnerability scanning για τα services μας
+          # Vulnerability scanning ΜΟΝΟ για τα services μας (χωρίς brute force)
           docker run --network=host \
             -v $(pwd)/nmap-results:/results \
             instrumentisto/nmap \
-            --script vulners \
-            -oX /results/nmap-vulners.xml \
-            -oN /results/nmap-vulners.txt \
+            --script "vulners,http-enum,http-security-headers" \
+            -p 8080,8081 \  # ΜΟΝΟ web ports
+            -oX /results/nmap-web-scan.xml \
+            -oN /results/nmap-web-scan.txt \
             localhost
 
-          # Ειδικά scans για τα services μας
+          # PostgreSQL security check (χωρίς brute force)
           docker run --network=host \
             -v $(pwd)/nmap-results:/results \
             instrumentisto/nmap \
-            --script "http-vuln*,ssl-*,ssh-*" \
-            -oX /results/nmap-web-vuln.xml \
-            -oN /results/nmap-web-vuln.txt \
-            localhost
-
-          # PostgreSQL specific scanning
-          docker run --network=host \
-            -v $(pwd)/nmap-results:/results \
-            instrumentisto/nmap \
-            --script "pgsql-brute,postgres-*" \
+            --script "pgsql-info" \  # Μόνο πληροφορίες, όχι επίθεση
             -p 5432 \
             -oX /results/nmap-pgsql-scan.xml \
             -oN /results/nmap-pgsql-scan.txt \
             localhost
 
-          # Redis specific scanning  
+          # Redis security check
           docker run --network=host \
             -v $(pwd)/nmap-results:/results \
             instrumentisto/nmap \
-            --script "redis-*" \
+            --script "redis-info" \  # Μόνο πληροφορίες
             -p 6379 \
             -oX /results/nmap-redis-scan.xml \
             -oN /results/nmap-redis-scan.txt \
