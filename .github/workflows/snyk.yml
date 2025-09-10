@@ -48,21 +48,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: |
-          cd RestaurantBookSystem
-          docker build -t smart-tourism-app -f Dockerfile-backend .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Run Snyk container test
+      - name: Build services with Docker Compose
+        run: docker compose -f docker-compose.yml build
+
+      - name: Run Snyk container test on backend
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -e SNYK_TOKEN=$SNYK_TOKEN \
-            snyk/snyk:docker snyk container test smart-tourism-app --file=RestaurantBookSystem/Dockerfile-backend --sarif-file-output=snyk-container.sarif
+            snyk/snyk:docker snyk container test restaurant_backend --file=Dockerfile-backend --sarif-file-output=snyk-container-backend.sarif
 
-      - name: Upload SARIF results (container)
+      - name: Run Snyk container test on frontend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e SNYK_TOKEN=$SNYK_TOKEN \
+            snyk/snyk:docker snyk container test restaurant_frontend --file=Dockerfile-frontend --sarif-file-output=snyk-container-frontend.sarif
+
+      - name: Upload SARIF results (backend container)
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: snyk-container.sarif
+          sarif_file: snyk-container-backend.sarif
+
+      - name: Upload SARIF results (frontend container)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-container-frontend.sarif
