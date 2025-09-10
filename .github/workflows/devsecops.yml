@@ -48,3 +48,7 @@ jobs:
   zap-baseline:
     name: ZAP Baseline Scan
     uses: ./.github/workflows/zap-baseline.yml
+  
+  sqlmap:
+    name: SQL Injection Scan (SQLMap)
+    uses: ./.github/workflows/sqlmap.yml

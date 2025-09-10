@@ -1,0 +1,52 @@
+name: SQL Injection Scan
+
+on:
+  workflow_call:
+
+jobs:
+  sqlmap-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start application
+        run: docker compose -f docker-compose.yml up -d --build
+
+      - name: Wait for application to be ready
+        run: |
+          echo "Waiting for application to start..."
+          sleep 30
+          curl --retry 10 --retry-delay 5 --retry-connrefused http://localhost:8080 || echo "Backend may not be fully ready"
+
+      - name: Create directory for SQLMap reports
+        run: mkdir -p sqlmap-reports
+
+      - name: Run SQLMap with automatic crawling
+        run: |
+            docker run --rm \
+            --network host \
+            -v $(pwd)/sqlmap-reports:/root/.sqlmap \
+            paoloo/sqlmap \
+            --url="http://localhost:8080/" \
+            --crawl=2 \          # Crawl depth 2 levels
+            --batch \
+            --level=1 \
+            --risk=1
+
+      - name: Display SQLMap results
+        run: |
+          echo "SQLMap Scan Results:"
+          ls -la sqlmap-reports/
+          if [ -f "sqlmap-reports/*.log" ]; then
+            cat sqlmap-reports/*.log || echo "No log files found"
+          fi
+
+      - name: Upload SQLMap reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqlmap-reports
+          path: sqlmap-reports/
+
+      - name: Stop application
+        run: docker compose -f docker-compose.yml down
