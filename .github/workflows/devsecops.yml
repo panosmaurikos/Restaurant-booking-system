@@ -44,3 +44,7 @@ jobs:
     uses: ./.github/workflows/sonarqube.yml
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  zap-baseline:
+    name: ZAP Baseline Scan
+    uses: ./.github/workflows/zap-baseline.yml

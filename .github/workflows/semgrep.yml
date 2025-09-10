@@ -15,19 +15,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run Semgrep scan and show results
+      - name: Run Semgrep (produce SARIF + JSON)
         run: |
           echo "📋 Running Semgrep scan..."
           docker run --rm \
             -v "$(pwd):/src" \
             semgrep/semgrep:latest \
-            semgrep scan --config=auto --verbose --sarif-output=/src/semgrep-results.sarif
-          
-          echo "🔍 Scan completed! Displaying results:"
-          cat semgrep-results.sarif | jq '.runs[0].results[] | {ruleId: .ruleId, message: .message.text, severity: .level, file: .locations[0].physicalLocation.artifactLocation.uri}' || echo "No issues found or error displaying results"
+            semgrep scan --config=auto --verbose --sarif-output=/src/semgrep-results.sarif --json --output=/src/semgrep-results.json || true
 
-      - name: Upload SARIF report
+      - name: Show Semgrep results (print everything)
+        run: |
+          echo "🔍 Displaying Semgrep JSON results (full):"
+          sudo apt-get update -y
+          sudo apt-get install -y jq || true
+          if [ -f semgrep-results.json ]; then
+            jq '.' semgrep-results.json || cat semgrep-results.json
+          else
+            echo "No semgrep-results.json found"
+          fi
+          echo
+          echo "🔍 Displaying SARIF (full):"
+          if [ -f semgrep-results.sarif ]; then
+            cat semgrep-results.sarif
+          else
+            echo "No semgrep-results.sarif found"
+          fi
+
+      - name: Upload SARIF + JSON
         uses: actions/upload-artifact@v4
         with:
           name: semgrep-results
-          path: semgrep-results.sarif
+          path: |
+            semgrep-results.sarif
+            semgrep-results.json
