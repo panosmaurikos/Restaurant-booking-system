@@ -65,10 +65,12 @@ jobs:
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
+            -v ${{ github.workspace }}:/project \
+            -w /project \
             -e SNYK_TOKEN=$SNYK_TOKEN \
             snyk/snyk:docker snyk container test restaurant_backend \
-            --file=Dockerfile-backend \
-            --sarif-file-output=snyk-container-backend.sarif
+            --file=/project/Dockerfile-backend \
+            --sarif-file-output=/project/snyk-container-backend.sarif
 
       - name: Run Snyk container test on frontend
         env:
@@ -76,10 +78,12 @@ jobs:
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
+            -v ${{ github.workspace }}:/project \
+            -w /project \
             -e SNYK_TOKEN=$SNYK_TOKEN \
             snyk/snyk:docker snyk container test restaurant_frontend \
-            --file=Dockerfile-frontend \
-            --sarif-file-output=snyk-container-frontend.sarif
+            --file=/project/Dockerfile-frontend \
+            --sarif-file-output=/project/snyk-container-frontend.sarif
 
       - name: Upload SARIF results (backend container)
         uses: github/codeql-action/upload-sarif@v3
