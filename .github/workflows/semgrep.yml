@@ -15,15 +15,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run Semgrep in Docker
+      - name: Run Semgrep scan and show results
         run: |
+          echo "📋 Running Semgrep scan..."
           docker run --rm \
             -v "$(pwd):/src" \
-            -e SEMGREP_APP_TOKEN=${{ secrets.SEMGREP_APP_TOKEN }} \
             semgrep/semgrep:latest \
-            semgrep ci --config=auto --sarif-output=/src/semgrep-results.sarif
-      - name: Upload Semgrep SARIF
+            semgrep scan --config=auto --verbose --sarif-output=/src/semgrep-results.sarif
+          
+          echo "🔍 Scan completed! Displaying results:"
+          cat semgrep-results.sarif | jq '.runs[0].results[] | {ruleId: .ruleId, message: .message.text, severity: .level, file: .locations[0].physicalLocation.artifactLocation.uri}' || echo "No issues found or error displaying results"
+
+      - name: Upload SARIF report
         uses: actions/upload-artifact@v4
         with:
-          name: semgrep-sarif
+          name: semgrep-results
           path: semgrep-results.sarif
