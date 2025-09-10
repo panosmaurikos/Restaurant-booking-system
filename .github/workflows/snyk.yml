@@ -31,15 +31,6 @@ jobs:
             chmod +x RestaurantBookSystem/mvnw
             ls -l RestaurantBookSystem/mvnw
           fi
-      - name: Run Snyk test (dependencies)
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/project \
-            -w /project/RestaurantBookSystem \
-            -e SNYK_TOKEN=$SNYK_TOKEN \
-            snyk/snyk:docker snyk test --all-projects --sarif-file-output=snyk-deps.sarif || true
 
       - name: Run Snyk code test (SAST)
         env:

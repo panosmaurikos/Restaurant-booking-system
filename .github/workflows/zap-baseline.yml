@@ -32,4 +32,4 @@ jobs:
           allow_issue_writing: false
 
       - name: Stop the application
-        run: docker-compose -f docker-compose.yml down
+        run: docker compose -f docker-compose.yml down
