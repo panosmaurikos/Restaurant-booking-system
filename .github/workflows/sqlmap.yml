@@ -27,7 +27,7 @@ jobs:
             docker run --rm \
             --network host \
             -v $(pwd)/sqlmap-reports:/root/.sqlmap \
-            paoloo/sqlmap \
+            panosmavrikos/sqlmap:1.9.9.1 \
             --url="http://localhost:8080/" \
             --crawl=2 \          # Crawl depth 2 levels
             --batch \
