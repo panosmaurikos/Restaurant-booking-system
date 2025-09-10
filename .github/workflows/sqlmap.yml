@@ -24,12 +24,13 @@ jobs:
 
       - name: Run SQLMap with automatic crawling
         run: |
-            docker run --rm \
+          set -euo pipefail
+          docker run --rm \
             --network host \
-            -v $(pwd)/sqlmap-reports:/root/.sqlmap \
+            -v "$(pwd)/sqlmap-reports":/root/.sqlmap \
             panosmavrikos/sqlmap:1.9.9.1 \
             --url="http://localhost:8080/" \
-            --crawl=2 \          # Crawl depth 2 levels
+            --crawl=2 \
             --batch \
             --level=1 \
             --risk=1
