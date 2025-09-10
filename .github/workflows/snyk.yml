@@ -67,7 +67,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -e SNYK_TOKEN=$SNYK_TOKEN \
             snyk/snyk:docker snyk container test restaurant_backend \
-            --file=backend/Dockerfile \
+            --file=Dockerfile-backend \
             --sarif-file-output=snyk-container-backend.sarif
 
       - name: Run Snyk container test on frontend
@@ -78,7 +78,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -e SNYK_TOKEN=$SNYK_TOKEN \
             snyk/snyk:docker snyk container test restaurant_frontend \
-            --file=frontend/Dockerfile \
+            --file=Dockerfile-frontend \
             --sarif-file-output=snyk-container-frontend.sarif
 
       - name: Upload SARIF results (backend container)
