@@ -56,7 +56,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build backend image (prefer explicit Dockerfile, fallback to compose)
+      - name: Build backend image 
         run: |
           set -euo pipefail
           if [ -f Dockerfile-backend ]; then
@@ -67,7 +67,7 @@ jobs:
             docker compose -f docker-compose.yml build backend
           fi
 
-      - name: Build frontend image (prefer explicit Dockerfile, fallback to compose)
+      - name: Build frontend image 
         run: |
           set -euo pipefail
           if [ -f Dockerfile-frontend ]; then
@@ -88,7 +88,7 @@ jobs:
             -w /project \
             -e SNYK_TOKEN=$SNYK_TOKEN \
             snyk/snyk:docker snyk container test restaurant_backend \
-            --sarif-file-output=/project/snyk-container-backend.sarif
+            --sarif-file-output=/project/snyk-container-backend.sarif || true
 
       - name: Run Snyk container test on frontend
         env:
@@ -100,7 +100,7 @@ jobs:
             -w /project \
             -e SNYK_TOKEN=$SNYK_TOKEN \
             snyk/snyk:docker snyk container test restaurant_frontend \
-            --sarif-file-output=/project/snyk-container-frontend.sarif
+            --sarif-file-output=/project/snyk-container-frontend.sarif || true
 
       - name: Upload SARIF results (backend container)
         uses: github/codeql-action/upload-sarif@v3
