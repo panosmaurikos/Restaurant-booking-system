@@ -21,4 +21,9 @@ jobs:
             -v "$(pwd):/src" \
             -e SEMGREP_APP_TOKEN=${{ secrets.SEMGREP_APP_TOKEN }} \
             semgrep/semgrep:latest \
-            semgrep ci --config=auto --error
+            semgrep ci --config=auto --sarif-output=/src/semgrep-results.sarif
+      - name: Upload Semgrep SARIF
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-sarif
+          path: semgrep-results.sarif
