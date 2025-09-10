@@ -56,8 +56,27 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build services with Docker Compose
-        run: docker compose -f docker-compose.yml build
+      - name: Build backend image (prefer explicit Dockerfile, fallback to compose)
+        run: |
+          set -euo pipefail
+          if [ -f Dockerfile-backend ]; then
+            docker build -t restaurant_backend -f Dockerfile-backend .
+          elif [ -f RestaurantBookSystem/Dockerfile ]; then
+            docker build -t restaurant_backend -f RestaurantBookSystem/Dockerfile RestaurantBookSystem
+          else
+            docker compose -f docker-compose.yml build backend
+          fi
+
+      - name: Build frontend image (prefer explicit Dockerfile, fallback to compose)
+        run: |
+          set -euo pipefail
+          if [ -f Dockerfile-frontend ]; then
+            docker build -t restaurant_frontend -f Dockerfile-frontend .
+          elif [ -f RestaurantFrontEndSystem/Dockerfile ]; then
+            docker build -t restaurant_frontend -f RestaurantFrontEndSystem/Dockerfile RestaurantFrontEndSystem
+          else
+            docker compose -f docker-compose.yml build frontend
+          fi
 
       - name: Run Snyk container test on backend
         env:
@@ -69,7 +88,6 @@ jobs:
             -w /project \
             -e SNYK_TOKEN=$SNYK_TOKEN \
             snyk/snyk:docker snyk container test restaurant_backend \
-            --file=/project/Dockerfile-backend \
             --sarif-file-output=/project/snyk-container-backend.sarif
 
       - name: Run Snyk container test on frontend
@@ -82,7 +100,6 @@ jobs:
             -w /project \
             -e SNYK_TOKEN=$SNYK_TOKEN \
             snyk/snyk:docker snyk container test restaurant_frontend \
-            --file=/project/Dockerfile-frontend \
             --sarif-file-output=/project/snyk-container-frontend.sarif
 
       - name: Upload SARIF results (backend container)
