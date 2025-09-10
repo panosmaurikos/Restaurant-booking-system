@@ -31,23 +31,36 @@ jobs:
             panosmavrikos/sqlmap:1.9.9.1 \
             --url="http://localhost:8080/" \
             --crawl=2 \
+            --forms \
             --batch \
-            --level=1 \
-            --risk=1
+            --level=2 \
+            --risk=1 \
+            --output-dir=/root/.sqlmap/output \
+          > sqlmap-reports/scan.stdout.log 2> sqlmap-reports/scan.stderr.log || true
 
       - name: Display SQLMap results
         run: |
-          echo "SQLMap Scan Results:"
-          ls -la sqlmap-reports/
-          if [ -f "sqlmap-reports/*.log" ]; then
-            cat sqlmap-reports/*.log || echo "No log files found"
-          fi
+          echo "SQLMap Scan Results (host-side):"
+          ls -la sqlmap-reports || true
+          echo "---- stdout (head) ----"
+          head -n 200 sqlmap-reports/scan.stdout.log || echo "(no stdout log)"
+          echo "---- stderr (head) ----"
+          head -n 200 sqlmap-reports/scan.stderr.log || echo "(no stderr log)"
+          echo "---- container output files ----"
+          shopt -s nullglob
+          for f in sqlmap-reports/output/* sqlmap-reports/*; do
+            if [ -f "$f" ]; then
+              echo "----- $f -----"
+              sed -n '1,200p' "$f" || true
+            fi
+          done
 
       - name: Upload SQLMap reports
         uses: actions/upload-artifact@v4
         with:
           name: sqlmap-reports
           path: sqlmap-reports/
+          if-no-files-found: warn
 
       - name: Stop application
         run: docker compose -f docker-compose.yml down
