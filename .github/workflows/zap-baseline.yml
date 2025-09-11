@@ -23,13 +23,19 @@ jobs:
           curl --retry 10 --retry-delay 5 --retry-connrefused http://localhost:8080
           curl --retry 10 --retry-delay 5 --retry-connrefused http://localhost:8081
 
-      - name: ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.14.0
+      - name: ZAP Full Scan (with authentication)
+        uses: zaproxy/action-full-scan@v0.12.0
         with:
           target: 'http://localhost:8081'
-          # rules_file_name: '.zap/rules.tsv'
-          cmd_options: '-I'  #
-          allow_issue_writing: false
+          cmd_options: >
+            -I
+            --auth-form-url="http://localhost:8081/login"
+            --auth-form-user="${{ secrets.ZAP_USERNAME }}"
+            --auth-form-pass="${{ secrets.ZAP_PASSWORD }}"
+            --auth-form-username-field="email"
+            --auth-form-password-field="password"
+            allow_issue_writing: false
+            artifact_name: zap_full_scan
 
       - name: Stop the application
         run: docker compose -f docker-compose.yml down
