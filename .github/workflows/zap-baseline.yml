@@ -29,13 +29,9 @@ jobs:
           target: 'http://localhost:8081'
           cmd_options: >
             -I
-            --auth-form-url="http://localhost:8081/login"
-            --auth-form-user="${{ secrets.ZAP_USERNAME }}"
-            --auth-form-pass="${{ secrets.ZAP_PASSWORD }}"
-            --auth-form-username-field="email"
-            --auth-form-password-field="password"
-            allow_issue_writing: false
-            artifact_name: zap_full_scan
+            -n .github/zap.context
+          allow_issue_writing: false
+          artifact_name: zap_full_scan
 
       - name: Stop the application
         run: docker compose -f docker-compose.yml down

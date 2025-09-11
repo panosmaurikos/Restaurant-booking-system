@@ -25,27 +25,28 @@ jobs:
       - name: Prepare SQLMap target list
         run: |
           cat > sqlmap-reports/targets.txt <<'TARGS'
-          http://localhost:8080/api/auth/register --data="username=test&password=test"
-          http://localhost:8080/api/auth/login --data="username=test&password=test"
-          http://localhost:8080/api/auth/verify --data="code=123456"
+          http://localhost:8080/api/auth/register --method=POST --data="username=test&password=test"
+          http://localhost:8080/api/auth/login --method=POST --data="username=test&password=test"
+          http://localhost:8080/api/auth/verify --method=POST --data="code=123456"
           http://localhost:8080/api/auth/logout
           http://localhost:8080/api/auth/github/register
           http://localhost:8080/api/auth/github/callback
-          http://localhost:8080/api/reservation/filters --data="date=2025-01-01"
-          http://localhost:8080/api/reservation/savereservation --data="table=1&user=1"
+          http://localhost:8080/api/reservation/filters --method=POST --data="date=2025-01-01"
+          http://localhost:8080/api/reservation/savereservation --method=POST --data="table=1&user=1"
           http://localhost:8080/api/reservation/tables
-          http://localhost:8080/api/reservation/returnable/1
-          http://localhost:8080/api/reservation/completed/1
-          http://localhost:8080/api/reservation/checkin --data="reservationId=1"
-          http://localhost:8080/api/reservation/availabletables --data="date=2025-01-01"
-          http://localhost:8080/api/reservation/cancel/1
-          http://localhost:8080/api/reservation/verify/1
-          http://localhost:8080/api/reservation/update/1 --data="table=2"
-          http://localhost:8080/api/reservation/send-verification-email/1
+          http://localhost:8080/api/reservation/returnable/1?id=1
+          http://localhost:8080/api/reservation/completed/1?id=1
+          http://localhost:8080/api/reservation/checkin --method=POST --data="reservationId=1"
+          http://localhost:8080/api/reservation/availabletables --method=POST --data="date=2025-01-01"
+          http://localhost:8080/api/reservation/cancel/1?id=1
+          http://localhost:8080/api/reservation/verify/1?id=1
+          http://localhost:8080/api/reservation/update/1 --method=PUT --data="table=2"
+          http://localhost:8080/api/reservation/send-verification-email/1?id=1
           http://localhost:8080/api/user/all
-          http://localhost:8080/api/user/update/1 --data="email=test@test.com"
-          http://localhost:8080/api/user/returnable/1
+          http://localhost:8080/api/user/update/1 --method=PUT --data="email=test@test.com"
+          http://localhost:8080/api/user/returnable/1?id=1
           TARGS
+
       - name: Run SQLMap on target endpoints
         run: |
           set -euo pipefail
