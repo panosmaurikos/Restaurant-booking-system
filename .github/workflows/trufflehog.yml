@@ -16,62 +16,44 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Απαραίτητο για έλεγχο ολόκληρου του git history
 
-      - name: Install TruffleHog
-        run: |
-          # Κατεβάζουμε απευθείας το binary χωρίς το install script
-          curl -sSL https://github.com/trufflesecurity/trufflehog/releases/download/v3.90.6/trufflehog_3.90.6_linux_amd64.tar.gz -o trufflehog.tar.gz
-          tar -xzf trufflehog.tar.gz
-          chmod +x trufflehog
-          sudo mv trufflehog /usr/local/bin/
-
-      - name: Create test secret for verification
-        run: |
-          # Δημιουργία test secret
-          echo "// Test secret - remove after testing" >> test_secret.java
-          echo "public static final String AWS_KEY = \"AKIATESTKEY1234567890\";" >> test_secret.java
-          echo "public static final String TOKEN = \"ghp_TESTgithubtoken1234567890\";" >> test_secret.java
-
-      - name: Run TruffleHog
+      - name: Run TruffleHog in Docker
         id: trufflehog-scan
         run: |
-          # Εκτέλεση TruffleHog
-          trufflehog filesystem . \
+          # Εκτέλεση TruffleHog μέσα σε Docker container
+          docker run --rm \
+            -v "$(pwd)":/code \
+            -w /code \
+            trufflesecurity/trufflehog:latest \
+            filesystem /code \
             --only-verified \
             --json \
             --debug > trufflehog_results.json || echo "exit_code=$?" >> $GITHUB_OUTPUT
 
-      - name: Show results for debugging
+      - name: Show scan results
         run: |
-          echo "=== TruffleHog Results ==="
-          [ -f trufflehog_results.json ] && cat trufflehog_results.json || echo "No results file found"
-          echo "=========================="
-
-      - name: Check for specific test secrets
-        run: |
-          # Έλεγχος αν βρήκε τα test secrets
-          if [ -f trufflehog_results.json ] && grep -q "AKIATESTKEY1234567890" trufflehog_results.json; then
-            echo "✅ Found AWS test key"
+          echo "=== TruffleHog Scan Results ==="
+          if [ -f trufflehog_results.json ] && [ -s trufflehog_results.json ]; then
+            cat trufflehog_results.json
+            echo "================================"
+            echo "❌ SECRETS FOUND! Check the report above."
           else
-            echo "❌ MISSING: AWS test key not found"
+            echo "✅ No secrets found"
+            echo "================================"
           fi
-          
-          if [ -f trufflehog_results.json ] && grep -q "ghp_TESTgithubtoken1234567890" trufflehog_results.json; then
-            echo "✅ Found GitHub test token"
-          else
-            echo "❌ MISSING: GitHub test token not found"
-          fi
-
-      - name: Cleanup test files
-        run: |
-          rm -f test_secret.java trufflehog_results.json trufflehog.tar.gz
 
       - name: Fail if secrets found
         run: |
           if [ -f trufflehog_results.json ] && [ -s trufflehog_results.json ]; then
-            echo "❌ TruffleHog found secrets!"
+            echo "❌ TruffleHog found verified secrets!"
+            echo "Please remove these secrets immediately and rotate them:"
+            cat trufflehog_results.json
             exit 1
           else
-            echo "✅ No secrets found"
+            echo "✅ No secrets found - code is clean!"
           fi
+
+      - name: Cleanup
+        run: |
+          rm -f trufflehog_results.json
