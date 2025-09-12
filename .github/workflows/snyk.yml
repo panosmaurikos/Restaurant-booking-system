@@ -102,10 +102,14 @@ jobs:
             snyk/snyk:docker snyk container test restaurant_frontend \
             --sarif-file-output=/project/snyk-container-frontend.sarif || true
 
+      - name: Split SARIF runs (backend)
+        run: |
+          npx @github/codeql-action/sarif-multirun-split snyk-container-backend.sarif
+
       - name: Upload SARIF results (backend container)
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: snyk-container-backend.sarif
+          sarif_file: snyk-container-backend-run-0.sarif
           category: snyk-container-backend
 
       - name: Upload SARIF results (frontend container)

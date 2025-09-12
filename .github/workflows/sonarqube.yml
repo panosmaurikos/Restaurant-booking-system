@@ -142,7 +142,8 @@ jobs:
           if [ -f sonar-issues.json ]; then
             jq -r '.issues[]?.severity' sonar-issues.json 2>/dev/null | sort | uniq -c | awk '{print "- "$2": "$1}' >> sonar-summary.md || echo "- none" >> sonar-summary.md
           else
-            echo "_No issues file found_" >> sonar
+            echo "_No issues file found_" >> sonar-summary.md
+          fi
 
       - name: Show Markdown summary in logs
         run: |
