@@ -75,35 +75,76 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y jq
 
+      - name: Inspect original SARIF files (debug)
+        run: |
+          for f in snyk-container-backend.sarif snyk-container-frontend.sarif; do
+            if [ -f "$f" ]; then
+              echo "---- $f ----"
+              jq '.runs | length as $n | {runs: $n, first_results: (.runs[0].results[:3] // []) }' "$f" | sed -n '1,20p'
+            else
+              echo "No $f"
+            fi
+          done
+
       - name: Merge backend SARIF runs into one run (if present)
+        id: merge-backend
         run: |
           IN=snyk-container-backend.sarif
           OUT=merged-snyk-container-backend.sarif
           if [ -f "$IN" ]; then
             echo "Merging backend SARIF runs -> $OUT"
-            # Keep top-level fields (including $schema, version, etc.) and replace runs with a single run
-            jq 'del(.runs) + { runs: [ { tool: .runs[0].tool, results: ( [ .runs[]?.results[] ] ), invocations: ( [ .runs[]?.invocations[] ] // [] ) } ] }' "$IN" > "$OUT"
-            echo "Merged file created: $OUT"
-            ls -l "$OUT"
+            # Create a single run with concatenated results and invocations (safe with ? operators)
+            jq '(.version // "") as $v | (. $> {}) | del(.runs) + { version: ($v), runs: [ { tool: .runs[0].tool, results: ( [ .runs[]?.results[] ] // [] ), invocations: ( [ .runs[]?.invocations[] ] // [] ) } ] }' "$IN" > "$OUT" || { echo "jq merge failed"; exit 1; }
+            echo "created $OUT"
+            echo "merged=true" >> $GITHUB_OUTPUT
           else
-            echo "No backend SARIF ($IN) found - skipping merge"
+            echo "No backend SARIF ($IN) - skipping merge"
+            echo "merged=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Merge frontend SARIF runs into one run (if present)
+        id: merge-frontend
         run: |
           IN=snyk-container-frontend.sarif
           OUT=merged-snyk-container-frontend.sarif
           if [ -f "$IN" ]; then
             echo "Merging frontend SARIF runs -> $OUT"
-            jq 'del(.runs) + { runs: [ { tool: .runs[0].tool, results: ( [ .runs[]?.results[] ] ), invocations: ( [ .runs[]?.invocations[] ] // [] ) } ] }' "$IN" > "$OUT"
-            echo "Merged file created: $OUT"
-            ls -l "$OUT"
+            jq '(.version // "") as $v | (. $> {}) | del(.runs) + { version: ($v), runs: [ { tool: .runs[0].tool, results: ( [ .runs[]?.results[] ] // [] ), invocations: ( [ .runs[]?.invocations[] ] // [] ) } ] }' "$IN" > "$OUT" || { echo "jq merge failed"; exit 1; }
+            echo "created $OUT"
+            echo "merged=true" >> $GITHUB_OUTPUT
           else
-            echo "No frontend SARIF ($IN) found - skipping merge"
+            echo "No frontend SARIF ($IN) - skipping merge"
+            echo "merged=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check merged SARIF files and set outputs
+        id: check-merged
+        run: |
+          be=false
+          fe=false
+          if [ -f merged-snyk-container-backend.sarif ]; then be=true; fi
+          if [ -f merged-snyk-container-frontend.sarif ]; then fe=true; fi
+          echo "backend_exists=$be" >> $GITHUB_OUTPUT
+          echo "frontend_exists=$fe" >> $GITHUB_OUTPUT
+          echo "Listing files for debug:"
+          ls -la merged-snyk-container-*.sarif || true
+
+      - name: Show merged SARIF snippets (debug)
+        if: steps.check-merged.outputs.backend_exists == 'true' || steps.check-merged.outputs.frontend_exists == 'true'
+        run: |
+          if [ -f merged-snyk-container-backend.sarif ]; then
+            echo "---- merged-snyk-container-backend.sarif (first 200 chars) ----"
+            head -c 200 merged-snyk-container-backend.sarif || true
+            echo; echo
+          fi
+          if [ -f merged-snyk-container-frontend.sarif ]; then
+            echo "---- merged-snyk-container-frontend.sarif (first 200 chars) ----"
+            head -c 200 merged-snyk-container-frontend.sarif || true
+            echo; echo
           fi
 
       - name: Upload SARIF results (backend container merged)
-        if: always()
+        if: steps.check-merged.outputs.backend_exists == 'true'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: merged-snyk-container-backend.sarif
@@ -111,7 +152,7 @@ jobs:
           wait-for-processing: true
 
       - name: Upload SARIF results (frontend container merged)
-        if: always()
+        if: steps.check-merged.outputs.frontend_exists == 'true'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: merged-snyk-container-frontend.sarif
