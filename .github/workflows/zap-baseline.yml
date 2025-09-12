@@ -1,37 +1,124 @@
-name: ZAP Baseline Scan
+name: ZAP Full Scan (Dockerized app + Form Auth)
 
 on:
-  workflow_call:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
-  zap-baseline:
+  zap-full-scan:
     runs-on: ubuntu-latest
+    env:
+      # ρυθμίσεις που μπορείς να αλλάξεις
+      BACKEND_URL: http://localhost:8080
+      FRONTEND_URL: http://localhost:8081
+      # Adjust register path if your app has a different endpoint
+      REGISTER_PATH: /login
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
+      - name: Set up Docker Buildx (needed for compose)
         uses: docker/setup-buildx-action@v3
 
       - name: Build and start services
-        run: docker compose -f docker-compose.yml up -d --build
-
-      - name: Wait for application to be ready
         run: |
-          echo "Waiting for app to start..."
-          sleep 30
-          curl --retry 10 --retry-delay 5 --retry-connrefused http://localhost:8080
-          curl --retry 10 --retry-delay 5 --retry-connrefused http://localhost:8081
+          docker compose -f docker-compose.yml up -d --build
 
-      - name: ZAP Full Scan (with authentication)
+      - name: Wait for app to be ready (backend + frontend)
+        run: |
+          # Wait loop for frontend and backend ports; adjust endpoints if you have /health endpoints
+          echo "Waiting for services to appear on ${FRONTEND_URL} and ${BACKEND_URL} ..."
+          for i in {1..30}; do
+            echo "Attempt $i ..."
+            ok_frontend=1
+            ok_backend=1
+            curl -sS --fail --max-time 5 ${FRONTEND_URL} >/dev/null 2>&1 || ok_frontend=0
+            curl -sS --fail --max-time 5 ${BACKEND_URL} >/dev/null 2>&1 || ok_backend=0
+            if [ "${ok_frontend}" -eq 1 ] && [ "${ok_backend}" -eq 1 ]; then
+              echo "Both frontend and backend are responding."
+              break
+            fi
+            sleep 5
+          done
+
+          # Final check and show minimal logs if not up
+          if ! curl -sS --fail --max-time 5 ${FRONTEND_URL} >/dev/null 2>&1 || ! curl -sS --fail --max-time 5 ${BACKEND_URL} >/dev/null 2>&1 ; then
+            echo "Services are not ready. Dumping docker compose logs for debugging:"
+            docker compose logs --no-color --tail=200
+            exit 1
+          fi
+
+      - name: Create test user (registration) — optional, uses secrets
+        if: ${{ github.secrets.ZAP_USERNAME != '' && github.secrets.ZAP_PASSWORD != '' }}
+        env:
+          ZAP_USERNAME: ${{ secrets.ZAP_USERNAME }}
+          ZAP_PASSWORD: ${{ secrets.ZAP_PASSWORD }}
+          FRONTEND_URL: ${{ env.FRONTEND_URL }}
+          REGISTER_PATH: ${{ env.REGISTER_PATH }}
+        run: |
+          # This tries to register a test user; adjust payload/URL to match your API
+          # NOTE: change POST body path/keys if your register endpoint expects different fields
+          echo "Attempting to register test user '${ZAP_USERNAME}' at ${FRONTEND_URL}${REGISTER_PATH}"
+          resp=$(curl -s -o /dev/stderr -w "%{http_code}" -X POST "${FRONTEND_URL}${REGISTER_PATH}" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"${ZAP_USERNAME}\", \"password\":\"${ZAP_PASSWORD}\"}" ) || true
+          echo "Register response code: $resp"
+          # If registration fails because user exists, that's fine; we proceed.
+          sleep 2
+
+      - name: (Optional) If your app requires server-side seeding instead of HTTP register
+        if: ${{ github.secrets.ZAP_USERNAME == '' || github.secrets.ZAP_PASSWORD == '' }}
+        run: |
+          echo "No ZAP credentials provided. If you want automatic login for ZAP, either:"
+          echo " - set repository secrets ZAP_USERNAME & ZAP_PASSWORD, or"
+          echo " - add a DB init script to docker-compose to create a test user on container startup."
+          # You can add provisioning steps here if you have CLI access to the container/db.
+          true
+
+      - name: ZAP Full Scan (authenticated)
         uses: zaproxy/action-full-scan@v0.12.0
         with:
-          target: 'http://localhost:8081'
-          cmd_options: >
-            -I
-            -n .github/zap.context
+          # target is the application entry you want scanned by ZAP
+          target: '${{ env.FRONTEND_URL }}'
+          docker_name: 'owasp/zap2docker-stable'
+          # Don't write issues to the repo automatically
           allow_issue_writing: false
           artifact_name: zap_full_scan
+          # cmd_options: pass form auth flags and reports
+          cmd_options: >
+            -I
+            --auth-form-url="${{ env.FRONTEND_URL }}/login"
+            --auth-form-user="${{ secrets.ZAP_USERNAME }}"
+            --auth-form-pass="${{ secrets.ZAP_PASSWORD }}"
+            --auth-form-username-field="email"
+            --auth-form-password-field="password"
+            -r zap-report.html
+            -J zap-report.json
 
-      - name: Stop the application
-        run: docker compose -f docker-compose.yml down
+      - name: Download and show small snippet of ZAP report (debug)
+        run: |
+          echo "Report files in working dir:"
+          ls -la zap-report.* || true
+          if [ -f zap-report.html ]; then
+            echo "---- html head ----"
+            head -n 40 zap-report.html || true
+          fi
+          if [ -f zap-report.json ]; then
+            echo "---- json preview ----"
+            jq '(.site[]? | .alerts[:5]?)' zap-report.json 2>/dev/null || true
+          fi
+
+      - name: Upload ZAP artifacts (full HTML + JSON)
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-scan-reports
+          path: |
+            zap-report.html
+            zap-report.json
+            zap-full-scan.log
+
+      - name: Stop services
+        if: always()
+        run: docker compose -f docker-compose.yml down --volumes --remove-orphans

@@ -21,7 +21,6 @@ jobs:
       - name: Run TruffleHog in Docker
         id: trufflehog-scan
         run: |
-          # Εκτέλεση TruffleHog μέσα σε Docker container
           docker run --rm \
             -v "$(pwd)":/code \
             -w /code \
@@ -43,12 +42,19 @@ jobs:
             echo "================================"
           fi
 
+      - name: Upload TruffleHog report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-report
+          path: trufflehog_results.json
+
       - name: Fail if secrets found
         run: |
           if [ -f trufflehog_results.json ] && [ -s trufflehog_results.json ]; then
             echo "❌ TruffleHog found verified secrets!"
             echo "Please remove these secrets immediately and rotate them:"
             cat trufflehog_results.json
+            echo "Exiting due to detected secrets."
             exit 1
           else
             echo "✅ No secrets found - code is clean!"
