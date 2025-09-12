@@ -104,7 +104,7 @@ jobs:
 
       - name: Split SARIF runs (backend)
         run: |
-          npx @github/codeql-action/sarif-multirun-split snyk-container-backend.sarif
+          npx github/codeql-action/sarif-multirun-split snyk-container-backend.sarif
 
       - name: Upload SARIF results (backend container)
         uses: github/codeql-action/upload-sarif@v3
