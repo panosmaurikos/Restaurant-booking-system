@@ -25,12 +25,6 @@ jobs:
           else
             echo "✅ SNYK_TOKEN is set"
           fi
-      - name: Make mvnw executable (if present)
-        run: |
-          if [ -f RestaurantBookSystem/mvnw ]; then
-            chmod +x RestaurantBookSystem/mvnw
-            ls -l RestaurantBookSystem/mvnw
-          fi
 
       - name: Run Snyk code test (SAST)
         env:
@@ -47,6 +41,7 @@ jobs:
         with:
           sarif_file: snyk-code.sarif
           category: snyk-code
+          wait-for-processing: true
 
   snyk-container:
     runs-on: ubuntu-latest
@@ -54,17 +49,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Debug check files
-        run: |
-          echo "=== Repository structure ==="
-          ls -R .
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build backend image 
         run: |
-          set -euo pipefail
           if [ -f Dockerfile-backend ]; then
             docker build -t restaurant_backend -f Dockerfile-backend .
           elif [ -f RestaurantBookSystem/Dockerfile ]; then
@@ -75,7 +64,6 @@ jobs:
 
       - name: Build frontend image 
         run: |
-          set -euo pipefail
           if [ -f Dockerfile-frontend ]; then
             docker build -t restaurant_frontend -f Dockerfile-frontend .
           elif [ -f RestaurantFrontEndSystem/Dockerfile ]; then
@@ -96,20 +84,6 @@ jobs:
             snyk/snyk:docker snyk container test restaurant_backend \
             --sarif-file-output=/project/snyk-container-backend.sarif || true
 
-      - name: Split SARIF runs (backend)
-        run: |
-          runs=$(jq '.runs | length' snyk-container-backend.sarif)
-          for i in $(seq 0 $((runs-1))); do
-            jq "{version: .version, runs: [.runs[$i]]}" snyk-container-backend.sarif > backend-$i.sarif
-          done
-
-      - name: Upload SARIF backend run 0
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: backend-0.sarif
-          category: snyk-container-backend-0
-          wait-for-processing: true
-
       - name: Run Snyk container test on frontend
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -121,6 +95,13 @@ jobs:
             -e SNYK_TOKEN=$SNYK_TOKEN \
             snyk/snyk:docker snyk container test restaurant_frontend \
             --sarif-file-output=/project/snyk-container-frontend.sarif || true
+
+      - name: Upload SARIF results (backend container)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-container-backend.sarif
+          category: snyk-container-backend
+          wait-for-processing: true
 
       - name: Upload SARIF results (frontend container)
         uses: github/codeql-action/upload-sarif@v3
