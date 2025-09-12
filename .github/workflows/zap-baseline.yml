@@ -1,9 +1,7 @@
 name: ZAP Full Scan (Dockerized app + Form Auth)
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
+  workflow_call:
 
 jobs:
   zap-full-scan:
@@ -13,7 +11,7 @@ jobs:
       BACKEND_URL: http://localhost:8080
       FRONTEND_URL: http://localhost:8081
       # Adjust register path if your app has a different endpoint
-      REGISTER_PATH: /login
+      REGISTER_PATH: /pages/login
 
     steps:
       - name: Checkout code
