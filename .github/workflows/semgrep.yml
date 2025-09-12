@@ -23,22 +23,18 @@ jobs:
             semgrep/semgrep:latest \
             semgrep scan --config=auto --verbose --sarif-output=/src/semgrep-results.sarif --json --output=/src/semgrep-results.json || true
 
-      - name: Show Semgrep results (print everything)
+      - name: Show Semgrep results (summary)
         run: |
-          echo "🔍 Displaying Semgrep JSON results (full):"
+          echo "🔍 Semgrep findings summary:"
           sudo apt-get update -y
           sudo apt-get install -y jq || true
           if [ -f semgrep-results.json ]; then
-            jq '.' semgrep-results.json || cat semgrep-results.json
+            jq -r '
+              .results[] |
+              "[\(.check_id)] [\(.extra.severity)] \(.path):\(.start.line) - \(.extra.message)"
+            ' semgrep-results.json || cat semgrep-results.json
           else
             echo "No semgrep-results.json found"
-          fi
-          echo
-          echo "🔍 Displaying SARIF (full):"
-          if [ -f semgrep-results.sarif ]; then
-            cat semgrep-results.sarif
-          else
-            echo "No semgrep-results.sarif found"
           fi
 
       - name: Upload SARIF + JSON
