@@ -72,29 +72,25 @@ jobs:
             docker compose -f docker-compose.yml build frontend
           fi
 
+      # CHANGE: Use official Snyk Docker Action instead of manual docker run
+      # This generates a single-run SARIF per image, avoiding the multi-run error
       - name: Run Snyk container test on backend
+        continue-on-error: true  # Don't fail workflow on vulnerabilities
+        uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v ${{ github.workspace }}:/project \
-            -w /project \
-            -e SNYK_TOKEN=$SNYK_TOKEN \
-            snyk/snyk:docker snyk container test restaurant_backend \
-            --sarif-file-output=/project/snyk-container-backend.sarif || true
+        with:
+          image: restaurant_backend
+          args: --sarif-file-output=snyk-container-backend.sarif  # Custom output file
 
       - name: Run Snyk container test on frontend
+        continue-on-error: true  # Don't fail workflow on vulnerabilities
+        uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v ${{ github.workspace }}:/project \
-            -w /project \
-            -e SNYK_TOKEN=$SNYK_TOKEN \
-            snyk/snyk:docker snyk container test restaurant_frontend \
-            --sarif-file-output=/project/snyk-container-frontend.sarif || true
+        with:
+          image: restaurant_frontend
+          args: --sarif-file-output=snyk-container-frontend.sarif  # Custom output file
 
       - name: Upload SARIF results (backend container)
         uses: github/codeql-action/upload-sarif@v3
