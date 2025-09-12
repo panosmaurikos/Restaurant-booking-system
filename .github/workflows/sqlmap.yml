@@ -70,6 +70,7 @@ jobs:
         run: |
           if grep -q "injectable" sqlmap-reports/scan.stdout.log; then
             echo "Vulnerabilities found! Failing workflow."
+            grep "injectable" sqlmap-reports/scan.stdout.log
             exit 1
           else
             echo "No vulnerabilities found."

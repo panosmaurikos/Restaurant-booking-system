@@ -89,33 +89,73 @@ jobs:
       - name: Merge backend SARIF runs into one run (if present)
         id: merge-backend
         run: |
+          set -euo pipefail
           IN=snyk-container-backend.sarif
           OUT=merged-snyk-container-backend.sarif
+
+          echo "jq version: $(jq --version 2>/dev/null || true)"
+
           if [ -f "$IN" ]; then
             echo "Merging backend SARIF runs -> $OUT"
-            # Create a single run with concatenated results and invocations (safe with ? operators)
-            jq '(.version // "") as $v | (. $> {}) | del(.runs) + { version: ($v), runs: [ { tool: .runs[0].tool, results: ( [ .runs[]?.results[] ] // [] ), invocations: ( [ .runs[]?.invocations[] ] // [] ) } ] }' "$IN" > "$OUT" || { echo "jq merge failed"; exit 1; }
-            echo "created $OUT"
-            echo "merged=true" >> $GITHUB_OUTPUT
+
+            # Safe jq that concatenates all runs[].results and runs[].invocations into a single run.
+            # Uses //[] and ? to be resilient when fields are missing.
+            if jq -e '.' "$IN" >/dev/null 2>&1; then
+              jq '{
+                version: (.version // "2.1.0"),
+                runs: [
+                  {
+                    tool: (.runs[0].tool // {}),
+                    results: ( [ .runs[]? | .results[]? ] // [] ),
+                    invocations: ( [ .runs[]? | .invocations[]? ] // [] )
+                  }
+                ]
+              }' "$IN" > "$OUT" || ( echo "jq merge failed" && exit 1 )
+              echo "created $OUT"
+              echo "merged=true" >> $GITHUB_OUTPUT
+            else
+              echo "Input SARIF is not valid JSON: $IN"
+              echo "merged=false" >> $GITHUB_OUTPUT
+            fi
           else
             echo "No backend SARIF ($IN) - skipping merge"
             echo "merged=false" >> $GITHUB_OUTPUT
           fi
 
+
       - name: Merge frontend SARIF runs into one run (if present)
         id: merge-frontend
         run: |
+          set -euo pipefail
           IN=snyk-container-frontend.sarif
           OUT=merged-snyk-container-frontend.sarif
+
+          echo "jq version: $(jq --version 2>/dev/null || true)"
+
           if [ -f "$IN" ]; then
             echo "Merging frontend SARIF runs -> $OUT"
-            jq '(.version // "") as $v | (. $> {}) | del(.runs) + { version: ($v), runs: [ { tool: .runs[0].tool, results: ( [ .runs[]?.results[] ] // [] ), invocations: ( [ .runs[]?.invocations[] ] // [] ) } ] }' "$IN" > "$OUT" || { echo "jq merge failed"; exit 1; }
-            echo "created $OUT"
-            echo "merged=true" >> $GITHUB_OUTPUT
+            if jq -e '.' "$IN" >/dev/null 2>&1; then
+              jq '{
+                version: (.version // "2.1.0"),
+                runs: [
+                  {
+                    tool: (.runs[0].tool // {}),
+                    results: ( [ .runs[]? | .results[]? ] // [] ),
+                    invocations: ( [ .runs[]? | .invocations[]? ] // [] )
+                  }
+                ]
+              }' "$IN" > "$OUT" || ( echo "jq merge failed" && exit 1 )
+              echo "created $OUT"
+              echo "merged=true" >> $GITHUB_OUTPUT
+            else
+              echo "Input SARIF is not valid JSON: $IN"
+              echo "merged=false" >> $GITHUB_OUTPUT
+            fi
           else
             echo "No frontend SARIF ($IN) - skipping merge"
             echo "merged=false" >> $GITHUB_OUTPUT
           fi
+
 
       - name: Check merged SARIF files and set outputs
         id: check-merged
