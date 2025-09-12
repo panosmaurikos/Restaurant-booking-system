@@ -16,8 +16,18 @@ jobs:
       - name: Wait for application to be ready
         run: |
           echo "Waiting for application to start..."
-          sleep 30
-          curl --retry 10 --retry-delay 5 --retry-connrefused http://localhost:8080 || echo "Backend may not be fully ready"
+          for i in {1..60}; do
+            if curl -f -s http://localhost:8080 > /dev/null; then
+              echo "Application is ready!"
+              break
+            fi
+            echo "Attempt $i: Application not ready yet. Waiting 5 seconds..."
+            sleep 5
+          done
+          if [ $i -eq 60 ]; then
+            echo "Timeout: Application did not start in time."
+            exit 1
+          fi
 
       - name: Create directory for SQLMap reports
         run: mkdir -p sqlmap-reports
@@ -53,13 +63,27 @@ jobs:
           docker run --rm \
             --network host \
             -v "$(pwd)/sqlmap-reports":/root/.sqlmap \
-            panosmavrikos/sqlmap:1.9.9.1 \
+            panosmavrikos/sqlmap:latest \
             -m /root/.sqlmap/targets.txt \
             --batch \
-            --level=2 \
-            --risk=1 \
+            --level=5 \
+            --risk=3 \
+            --tamper=space2comment,between,randomcase \
+            --random-agent \
+            --dbms=H2 \
+            --proxy=http://localhost:8080 \
+            --flush-session \
             --output-dir=/root/.sqlmap/output \
           > sqlmap-reports/scan.stdout.log 2> sqlmap-reports/scan.stderr.log || true
+
+      - name: Check for vulnerabilities
+        run: |
+          if grep -q "injectable" sqlmap-reports/scan.stdout.log; then
+            echo "Vulnerabilities found! Failing workflow."
+            exit 1
+          else
+            echo "No vulnerabilities found."
+          fi
 
       - name: Display SQLMap results
         run: |
@@ -86,4 +110,5 @@ jobs:
           if-no-files-found: warn
 
       - name: Stop application
+        if: always()
         run: docker compose -f docker-compose.yml down
