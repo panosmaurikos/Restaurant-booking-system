@@ -61,7 +61,7 @@ jobs:
       - name: Create test user for ZAP scanning
         run: |
           echo "Creating test user for ZAP scanning..."
-          docker compose exec -T restaurant_database psql -U usersystem -d reservsystem << EOF
+          docker compose exec -T db psql -U usersystem -d reservsystem << EOF
           INSERT INTO users (username, email, password, role, enabled)
           VALUES ('zapuser', 'zap@example.com', '\$2a\$10\$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'USER', true)
           ON CONFLICT (email) DO NOTHING;
