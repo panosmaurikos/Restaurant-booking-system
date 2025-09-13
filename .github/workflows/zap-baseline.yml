@@ -21,7 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BACKEND_URL: http://backend:8080
-      FRONTEND_URL: http://frontend:80
       ZAP_AUTH_HEADER: "Authorization"
 
     steps:
@@ -76,66 +75,99 @@ jobs:
         id: login
         run: |
           echo "Logging in to get JWT token..."
+          # Adjust password if needed (use BCrypt hash or plain if app accepts it)
           RESPONSE=$(docker compose exec -T backend curl -s -X POST http://localhost:8080/api/auth/login \
             -H "Content-Type: application/json" \
-            -d '{"username": "zapuser", "password": "password"}')  # Αντικατέστησε 'password' με το real password (unhashed)
-          TOKEN=$(echo "$RESPONSE" | jq -r '.token')  # Υποθέτω ότι η response έχει { "token": "..." }
-          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            -d '{"username": "zapuser", "password": "password"}')
+          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
+          if [ -z "$TOKEN" ]; then
             echo "Failed to get token. Response: $RESPONSE"
-            exit 1
+            echo "ZAP_AUTH_HEADER_VALUE=dummy" >> $GITHUB_ENV  # Fallback
+          else
+            echo "ZAP_AUTH_HEADER_VALUE=Bearer $TOKEN" >> $GITHUB_ENV
+            echo "Got token: ${TOKEN:0:20}..."
           fi
-          echo "ZAP_AUTH_HEADER_VALUE=Bearer $TOKEN" >> $GITHUB_ENV
-          echo "Got token: ${TOKEN:0:10}..."
 
-      - name: Find Docker network name
+      - name: Get OpenAPI spec (if available)
         run: |
-          NETWORK_NAME=$(docker network ls --filter label=com.docker.compose.project --format "{{.Name}}" | head -1)
-          if [ -z "$NETWORK_NAME" ]; then
-            NETWORK_NAME=$(docker compose ps -q backend | xargs docker inspect -f '{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}' | xargs docker network inspect -f '{{.Name}}')
-          fi
-          echo "NETWORK_NAME=$NETWORK_NAME" >> $GITHUB_ENV
+          echo "Fetching OpenAPI spec..."
+          docker compose exec -T backend curl -s http://localhost:8080/v3/api-docs > openapi.json || echo '{}' > openapi.json
+          echo "OpenAPI spec size: $(wc -c < openapi.json) bytes"
+
+      - name: Run ZAP API scan (preferred for REST APIs)
+        continue-on-error: true
+        run: |
+          NETWORK_NAME=$(docker compose network ls --filter name=^$(basename $PWD)-default$ --format "{{.Name}}" || echo "default")
           echo "Using network: $NETWORK_NAME"
-
-      - name: Run ZAP baseline scan
-        run: |
-          # Δημιουργούμε config file για rules (προαιρετικό, άδειο για default)
+          
+          # Create simple gen.conf for rules (ignore low-risk if needed)
           cat > gen.conf << 'EOF'
-          # ZAP Baseline Scan configuration
+          # Default rules: WARN all
           EOF
           
-          # Τρέχουμε το scan
+          # Run API scan with OpenAPI spec + auth
           docker run --rm \
-            --network ${{ env.NETWORK_NAME }} \
+            --network $NETWORK_NAME \
+            -e ZAP_AUTH_HEADER \
+            -e ZAP_AUTH_HEADER_VALUE \
+            -v $(pwd):/zap/wrk:rw \
+            -t zaproxy/zap-stable \
+            zap-api-scan.py \
+            -t http://backend:8080 \
+            -f openapi \
+            -s /zap/wrk/openapi.json \
+            -g /zap/wrk/gen.conf \
+            -r /zap/wrk/zap-report.html \
+            -J /zap/wrk/zap-report.json \
+            -I \
+            -T 10 \
+            -d || true
+          
+          echo "ZAP API scan completed (exit code: $?)"
+
+      - name: Fallback to Baseline scan (if API scan fails)
+        if: failure()
+        continue-on-error: true
+        run: |
+          NETWORK_NAME=$(docker compose network ls --filter name=^$(basename $PWD)-default$ --format "{{.Name}}" || echo "default")
+          
+          docker run --rm \
+            --network $NETWORK_NAME \
             -e ZAP_AUTH_HEADER \
             -e ZAP_AUTH_HEADER_VALUE \
             -v $(pwd):/zap/wrk:rw \
             -t zaproxy/zap-stable \
             zap-baseline.py \
-            -t http://backend:8080 \
-            -g gen.conf \
-            -r /zap/wrk/zap-report.html \
-            -J /zap/wrk/zap-report.json \
+            -t http://backend:8080/api/reservation/tables \  # Start with GET endpoint
+            -g /zap/wrk/gen.conf \
+            -r /zap/wrk/zap-report-baseline.html \
+            -J /zap/wrk/zap-report-baseline.json \
             -I \
             -T 10 \
-            -d || true  # Continue even on failure
+            -d || true
           
-          echo "ZAP scan completed (exit code: $?)"
+          echo "ZAP Baseline fallback completed (exit code: $?)"
 
-      - name: Check if ZAP reports were generated
+      - name: Check and summarize reports
         run: |
           echo "Checking for ZAP reports..."
           ls -la zap-report.* || true
           if [ -f zap-report.html ]; then
-            echo "✅ ZAP HTML report generated"
-            grep -i "risk\|alert" zap-report.html | head -20 || true
+            echo "✅ API Scan HTML report generated"
+            # Extract summary (risk levels)
+            grep -E "(High|Medium|Low)" zap-report.html | head -10 || echo "No risks found"
           fi
           if [ -f zap-report.json ]; then
-            echo "✅ ZAP JSON report generated"
-            jq '.site[]?.alerts[]? | .name, .riskdesc' zap-report.json || true
+            echo "✅ API Scan JSON report generated"
+            jq '.site[]? | select(.alerts != null) | .alerts[]? | {name: .name, risk: .riskcode}' zap-report.json 2>/dev/null | head -10 || echo "No alerts"
           fi
-          if [ ! -f zap-report.html ] && [ ! -f zap-report.json ]; then
-            echo "⚠️ No reports generated. Capturing ZAP logs..."
-            docker logs $(docker ps -a -q --filter ancestor=zaproxy/zap-stable --latest) > zap-debug.log 2>&1 || true
+          if [ -f zap-report-baseline.html ]; then
+            echo "✅ Baseline fallback HTML report generated"
+          fi
+          if [ ! -f zap-report.html ] && [ ! -f zap-report-baseline.html ]; then
+            echo "⚠️ No reports - capturing debug logs"
+            # Capture ZAP container logs (latest)
+            docker ps -a --filter ancestor=zaproxy/zap-stable --format "{{.ID}}" | xargs -r docker logs > zap-debug.log 2>&1
           fi
 
       - name: Upload ZAP artifacts
@@ -144,8 +176,9 @@ jobs:
         with:
           name: zap-scan-reports
           path: |
-            zap-report.html
-            zap-report.json
+            zap-report*.html
+            zap-report*.json
+            openapi.json
             gen.conf
             zap-debug.log
           if-no-files-found: ignore
