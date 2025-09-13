@@ -73,7 +73,6 @@ jobs:
         run: |
           set -euo pipefail
           echo "Starting SQLMap scan..."
-          # Χρήση --answers για αυτόματες απαντήσεις σε interactive prompts
           docker run --rm \
             --network host \
             -v "$(pwd)/sqlmap-reports":/root/.sqlmap \
