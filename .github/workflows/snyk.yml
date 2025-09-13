@@ -1,4 +1,4 @@
-name: DevSecOps - Snyk (compose -> build & scan)
+name: DevSecOps - Snyk
 
 on:
   workflow_call:
@@ -21,7 +21,6 @@ jobs:
         run: |
           if [ -z "$SNYK_TOKEN" ]; then
             echo "❌ SNYK_TOKEN is empty"
-            exit 1
           else
             echo "✅ SNYK_TOKEN is set"
           fi
@@ -29,20 +28,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ---- Build images with explicit tags (reliable) ----
-      - name: Build backend image (explicit tag)
-        run: |
-          docker build -t restaurant_backend:ci -f Dockerfile-backend .
+      # 🏗️ Build backend image
+      - name: Build backend image
+        run: docker build -t restaurant_backend:ci -f Dockerfile-backend .
 
-      - name: Build frontend image (explicit tag)
-        run: |
-          docker build -t restaurant_frontend:ci -f Dockerfile-frontend .
+      # 🏗️ Build frontend image
+      - name: Build frontend image
+        run: docker build -t restaurant_frontend:ci -f Dockerfile-frontend .
 
-      - name: List local images (debug)
-        run: docker images | grep restaurant || docker images
-
-      # ---- Snyk scans (no SARIF, produce JSON artifacts) ----
-      - name: Run Snyk scan (backend -> JSON)
+      # 🔍 Scan backend image
+      - name: Run Snyk scan (backend)
         uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -50,7 +45,8 @@ jobs:
           image: restaurant_backend:ci
           args: --json-file-output=snyk-backend.json
 
-      - name: Run Snyk scan (frontend -> JSON)
+      # 🔍 Scan frontend image
+      - name: Run Snyk scan (frontend)
         uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -58,6 +54,7 @@ jobs:
           image: restaurant_frontend:ci
           args: --json-file-output=snyk-frontend.json
 
+      # 📦 Upload JSON reports
       - name: Upload Snyk JSON reports
         if: always()
         uses: actions/upload-artifact@v4

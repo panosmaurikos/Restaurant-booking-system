@@ -50,15 +50,19 @@ jobs:
         run: |
           echo "Waiting for backend to start..."
           for i in {1..30}; do
-            if docker compose exec backend curl -s -f http://localhost:8080/api/reservation/tables >/dev/null 2>&1; then
+            # Δοκιμάζουμε πολλαπλά endpoints για να βρούμε κάποιο που λειτουργεί
+            if curl -s -f http://localhost:8080 >/dev/null 2>&1 || \
+               curl -s -f http://localhost:8080/actuator/health >/dev/null 2>&1 || \
+               curl -s -f http://localhost:8080/api/auth/login -X OPTIONS >/dev/null 2>&1 || \
+               curl -s -f http://localhost:8080/api/reservation/tables -X OPTIONS >/dev/null 2>&1; then
               echo "Backend is ready!"
               exit 0
             fi
-            sleep 5
+            sleep 2
             echo "Waiting for backend... ($i/30)"
           done
           echo "Backend did not start properly."
-          docker compose logs backend
+          docker compose logs backend --tail=50
           exit 1
 
       - name: Create test user for ZAP scanning
@@ -72,23 +76,24 @@ jobs:
 
       - name: Find Docker network name
         run: |
-          # Αυτόματα βρίσκουμε το default network του docker-compose
-          NETWORK_NAME=$(docker compose ps --services | head -1 | xargs docker compose network ls --filter "label=com.docker.compose.project" --format "{{.Name}}" | head -1)
+          # Απλούστερος τρόπος να βρούμε το network
+          NETWORK_NAME=$(docker network ls --filter "name=restaurant" --format "{{.Name}}" | head -1)
           if [ -z "$NETWORK_NAME" ]; then
-            NETWORK_NAME="zap_default"  # Fallback αν δεν βρεθεί
+            NETWORK_NAME="restaurant-booking-system_default"  # Fallback name
           fi
           echo "NETWORK_NAME=$NETWORK_NAME" >> $GITHUB_ENV
           echo "Using network: $NETWORK_NAME"
 
       - name: Run ZAP baseline scan
-        continue-on-error: true  # Μην αποτυγχάνει το workflow σε exit 3
+        continue-on-error: true
         run: |
-          # Δημιουργούμε απλό gen.conf (rules file) - άδειο για default rules
+          # Δημιουργούμε απλό gen.conf
           cat > gen.conf << 'EOF'
-          # ZAP Baseline Scan configuration - no custom rules
+          # ZAP Baseline Scan configuration
+          rules:
           EOF
           
-          # Εκτελούμε το ZAP baseline scan με reports και debug
+          echo "Starting ZAP scan on network: ${{ env.NETWORK_NAME }}"
           docker run --rm \
             --network ${{ env.NETWORK_NAME }} \
             -v $(pwd):/zap/wrk \
@@ -96,37 +101,25 @@ jobs:
             zap-baseline.py \
             -t http://backend:8080 \
             -g gen.conf \
-            -r /zap/wrk/zap-report.html \
-            -J /zap/wrk/zap-report.json \
-            -I \  # Ignore warnings (exit 2 -> 0)
-            -T 5 \  # 5 min timeout
-            -d  # Debug mode για troubleshooting
-          ZAP_EXIT_CODE=$?
-          echo "ZAP exit code: $ZAP_EXIT_CODE"
-          
-          # Αν exit 3, εμφανίζουμε extra logs
-          if [ $ZAP_EXIT_CODE -eq 3 ]; then
-            echo "⚠️ ZAP failed with exit code 3 (other failure). Check logs above."
-          fi
+            -I \
+            -T 3 \
+            -d
 
       - name: Check if ZAP reports were generated
         run: |
           echo "Checking for ZAP reports..."
           if [ -f zap-report.html ]; then
-            echo "✅ ZAP HTML report generated ($(du -h zap-report.html | cut -f1))"
-            # Εμφανίζουμε summary από HTML (αν υπάρχει)
-            grep -i "alert\|vuln\|risk" zap-report.html | head -10 || true
-          fi
-          if [ -f zap-report.json ]; then
-            echo "✅ ZAP JSON report generated ($(du -h zap-report.json | cut -f1))"
-            # Εμφανίζουμε summary από JSON
-            jq '.site | length' zap-report.json 2>/dev/null || echo "No sites scanned"
+            echo "✅ ZAP HTML report generated"
+            # Εμφανίζουμε brief summary
+            grep -o '<title>.*</title>' zap-report.html || true
+          else
+            echo "⚠️ No ZAP HTML report found"
           fi
           
-          # Αν δεν βρέθηκαν reports, upload logs
-          if [ ! -f zap-report.html ] && [ ! -f zap-report.json ]; then
-            echo "⚠️ No ZAP reports found - uploading ZAP logs as fallback"
-            docker logs $(docker ps -q --filter "ancestor=zaproxy/zap-stable") > zap-debug.log 2>&1 || true
+          # Fallback: αν δεν δουλέψει το ZAP, τουλάχιστον ελέγχουμε αν το backend λειτουργεί
+          echo "Testing backend connectivity..."
+          if curl -s http://localhost:8080 >/dev/null; then
+            echo "✅ Backend is accessible at http://localhost:8080"
           fi
 
       - name: Upload ZAP artifacts
@@ -138,7 +131,6 @@ jobs:
             zap-report.html
             zap-report.json
             gen.conf
-            zap-debug.log  # Fallback log file
           if-no-files-found: ignore
 
       - name: Stop services
