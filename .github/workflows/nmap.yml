@@ -97,7 +97,7 @@ jobs:
           # Copy files to root for easier access
           cp nmap-results/* .
           
-          echo "✅ All scan files:"
+          echo " All scan files:"
           ls -la *.xml *.txt
 
       - name: Generate comprehensive HTML reports
@@ -105,39 +105,38 @@ jobs:
             sudo apt-get install -y xsltproc pandoc curl
             curl -s https://svn.nmap.org/nmap/docs/nmap.xsl -o nmap.xsl
             
-            # Χρησιμοποίησε τα ΠΡΑΓΜΑΤΙΚΑ ονόματα αρχείων που υπάρχουν
             xsltproc -o nmap-full-report.html nmap.xsl nmap-full-scan.xml
             xsltproc -o nmap-web-report.html nmap.xsl nmap-web-scan.xml
             xsltproc -o nmap-pgsql-report.html nmap.xsl nmap-pgsql-scan.xml
             xsltproc -o nmap-redis-report.html nmap.xsl nmap-redis-scan.xml
 
             cat > security-summary.md << EOF
-                # 🛡️ Application Security Scan Report
+                #  Application Security Scan Report
 
-                ## 📅 Scan Date: $(date)
-                ## 🎯 Target: localhost
+                ##  Scan Date: $(date)
+                ##  Target: localhost
 
-                ## 📊 Application Ports Scan
+                ##  Application Ports Scan
                 \`\`\`bash
                 $(grep "open" nmap-full-scan.txt | sort -n)
                 \`\`\`
 
-                ## 🌐 Web Application Details
+                ##  Web Application Details
                 \`\`\`bash
                 $(grep -A3 -B2 "8080/tcp\|8081/tcp" nmap-full-scan.txt)
                 \`\`\`
 
-                ## 🗄️ Database Services
+                ##  Database Services
                 \`\`\`bash
                 $(grep -A3 -B2 "5432/tcp\|6379/tcp" nmap-full-scan.txt)
                 \`\`\`
 
-                ## 🔍 Detected Services
+                ##  Detected Services
                 \`\`\`bash
                 $(grep -E "Apache|nginx|Tomcat|PostgreSQL|Redis" nmap-full-scan.txt | head -8)
                 \`\`\`
 
-                ## ⚡ Quick Stats
+                ##  Quick Stats
                 - **Open Ports**: $(grep -c "open" nmap-full-scan.txt)
                 - **Web Services**: 2 (Tomcat + nginx)
                 - **Database Services**: 2 (PostgreSQL + Redis)
@@ -158,21 +157,21 @@ jobs:
 
       - name: Display security summary
         run: |
-            echo "🔒 APPLICATION SECURITY SCAN COMPLETED 🔒"
+            echo " APPLICATION SECURITY SCAN COMPLETED "
             echo "=========================================="
-            echo "📊 Open ports found:"
+            echo " Open ports found:"
             grep "open" nmap-full-scan.txt | sort -n
             echo ""
-            echo "🌐 Web server details:"
+            echo " Web server details:"
             grep -A5 -B2 "8080/tcp\|8081/tcp" nmap-full-scan.txt
             echo ""
-            echo "🗄️ Database details:"
+            echo " Database details:"
             grep -A5 -B2 "5432/tcp\|6379/tcp" nmap-full-scan.txt
             echo ""
-            echo "🔍 Service versions:"
+            echo " Service versions:"
             grep -E "Service|Version|Apache|nginx|Tomcat|PostgreSQL|Redis" nmap-full-scan.txt | head -10
             echo ""
-            echo "📁 Full security reports available as artifacts"
+            echo " Full security reports available as artifacts"
 
       - name: Stop services
         run: docker compose -f docker-compose.yml down

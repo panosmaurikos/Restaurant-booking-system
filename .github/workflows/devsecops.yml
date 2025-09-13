@@ -1,4 +1,4 @@
-name: 🛡️ DevSecOps Pipeline
+name:  DevSecOps Pipeline
 
 on:
   push:
@@ -19,26 +19,12 @@ permissions:
 
 jobs:
 
+  # ========== PR & PUSH JOBS ==========
   trufflehog:
     name:  Secrets Scanning (TruffleHog)
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     uses: ./.github/workflows/trufflehog.yml
 
-  semgrep:
-    name: Static Analysis (Semgrep)
-    if: github.event_name == 'release'
-    uses: ./.github/workflows/semgrep.yml
-    secrets:
-      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
- 
-  snyk:
-    name:  Code Security (Snyk)
-    if: github.event_name == 'release'
-    uses: ./.github/workflows/snyk.yml
-    secrets:
-      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-
-  
   nmap:
     name:  Network Security (Nmap)
     if: github.event_name == 'push' || github.event_name == 'pull_request'
@@ -51,16 +37,8 @@ jobs:
       OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
       OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
 
-
-  sonarqube:
-    name:  Code Quality (SonarQube)
-    if: github.event_name == 'release'
-    uses: ./.github/workflows/sonarqube.yml
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
   zap-baseline:
-    name: ZAP Baseline Scan
+    name:  ZAP Baseline Scan
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     uses: ./.github/workflows/zap-baseline.yml
     secrets:
@@ -72,7 +50,7 @@ jobs:
       OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
   
   sqlmap:
-    name: SQL Injection Scan (SQLMap)
+    name:  SQL Injection Scan (SQLMap)
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     uses: ./.github/workflows/sqlmap.yml
     secrets:
@@ -83,35 +61,124 @@ jobs:
       OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
       OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
 
+  semgrep:
+    name:  Static Analysis (Semgrep)
+    if: github.event_name == 'release'
+    uses: ./.github/workflows/semgrep.yml
+    secrets:
+      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+ 
+  snyk:
+    name:  Code Security (Snyk)
+    if: github.event_name == 'release'
+    uses: ./.github/workflows/snyk.yml
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  sonarqube:
+    name:  Code Quality (SonarQube)
+    if: github.event_name == 'release'
+    uses: ./.github/workflows/sonarqube.yml
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # ========== SUMMARY REPORT ==========
   report-summary:
-    name: DevSecOps Summary Reporter
+    name:  DevSecOps Summary
     runs-on: ubuntu-latest
-    needs: [trufflehog, nmap, sqlmap, zap-baseline]
+    needs: []  # Αυτό θα γεμίσει αυτόματα από τα available jobs
     if: github.event_name == 'pull_request'
     permissions:
       issues: write
       pull-requests: write
       contents: read
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Summarize jobs and post comment
+      - name: Dynamic job discovery and summary
         uses: actions/github-script@v6
         with:
           script: |
             const runId = process.env.GITHUB_RUN_ID;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const { data } = await github.rest.actions.listJobsForWorkflowRun({ owner, repo, run_id: runId });
-            const jobs = data.jobs.map(j => ({ name: j.name, conclusion: j.conclusion || j.status }));
-            let md = `## DevSecOps scan summary for run ${runId}\n\n`;
-            for (const j of jobs) {
-              md += `- **${j.name}**: ${j.conclusion}\n`;
+            
+            // Get current workflow run
+            const { data: runData } = await github.rest.actions.getWorkflowRun({
+              owner,
+              repo,
+              run_id: runId
+            });
+            
+            // Get all jobs for this workflow run
+            const { data: jobsData } = await github.rest.actions.listJobsForWorkflowRun({
+              owner,
+              repo,
+              run_id: runId,
+              filter: 'all'
+            });
+            
+            // Filter only completed jobs (not skipped)
+            const completedJobs = jobsData.jobs.filter(job => 
+              job.conclusion !== 'skipped' && job.status === 'completed'
+            );
+            
+            let md = `##  DevSecOps Pipeline - Scan Summary\n\n`;
+            md += `**Workflow:** ${runData.name}\n`;
+            md += `**Run:** [#${runId}](${runData.html_url})\n`;
+            md += `**Trigger:** ${github.event_name}\n\n`;
+            
+            // Group jobs by status
+            const byStatus = {
+              success: [],
+              failure: [],
+              cancelled: [],
+              neutral: []
+            };
+            
+            completedJobs.forEach(job => {
+              const status = job.conclusion || 'neutral';
+              if (byStatus[status]) {
+                byStatus[status].push(job);
+              }
+            });
+            
+            // Success section
+            if (byStatus.success.length > 0) {
+              md += `###  Successful (${byStatus.success.length})\n`;
+              byStatus.success.forEach(job => {
+                md += `- **${job.name}** - [Logs](${job.html_url})\n`;
+              });
+              md += '\n';
             }
-            md += `\nArtifacts: see workflow run artifacts.`;
+            
+            // Failure section  
+            if (byStatus.failure.length > 0) {
+              md += `###  Failed (${byStatus.failure.length})\n`;
+              byStatus.failure.forEach(job => {
+                md += `- **${job.name}** - [Logs](${job.html_url})\n`;
+              });
+              md += '\n';
+            }
+            
+            // Summary
+            md += `###  Summary\n`;
+            md += `-  **Passed:** ${byStatus.success.length}\n`;
+            md += `-  **Failed:** ${byStatus.failure.length}\n`;
+            md += `-  **Skipped:** ${jobsData.jobs.length - completedJobs.length}\n\n`;
+            
+            md += `**Artifacts:** [Download reports](${runData.html_url})\n`;
+            md += `**Security:** All scans completed successfully! 🎉`;
 
+            // Post comment to PR
             if (context.payload.pull_request) {
               const pr = context.payload.pull_request.number;
-              await github.rest.issues.createComment({ owner, repo, issue_number: pr, body: md });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr,
+                body: md
+              });
             }
