@@ -31,14 +31,13 @@ jobs:
       - name: Build images with Docker Compose
         run: docker compose -f docker-compose.yml build
 
-      # 🔍 Scan backend image
       - name: Run Snyk scan (backend)
         uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: restaurant_backend       # <--- το όνομα του backend container
-          args: test --json-file-output=snyk-backend.json
+          image: restaurant_backend
+          args: --json-file-output=snyk-backend.json
 
       # 🔍 Scan frontend image
       - name: Run Snyk scan (frontend)
@@ -46,9 +45,9 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: restaurant_frontend      # <--- το όνομα του frontend container
-          args: test --json-file-output=snyk-frontend.json
-          
+          image: restaurant_frontend
+          args: --json-file-output=snyk-frontend.json
+                
 
       # 📦 Upload artifacts (JSON reports)
       - name: Upload Snyk JSON reports
