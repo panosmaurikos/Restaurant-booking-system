@@ -16,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Απαραίτητο για έλεγχο ολόκληρου του git history
+          fetch-depth: 0 # git history
 
       - name: Run TruffleHog in Docker
         id: trufflehog-scan
