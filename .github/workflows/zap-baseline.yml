@@ -110,22 +110,40 @@ jobs:
           EOF
           
           # Run API scan
-          docker run --rm \
-            --network $NETWORK_NAME \
-            -e ZAP_AUTH_HEADER="Authorization" \
-            -e ZAP_AUTH_HEADER_VALUE="${{ env.ZAP_AUTH_HEADER_VALUE }}" \
-            -v $(pwd):/zap/wrk:rw \
-            -t ghcr.io/zaproxy/zaproxy:stable \
-            zap-api-scan.py \
-            -t http://backend:8080 \
-            -f openapi \
-            -s /zap/wrk/openapi.json \
-            -g /zap/wrk/gen.conf \
-            -r /zap/wrk/zap-report.html \
-            -J /zap/wrk/zap-report.json \
-            -I \
-            -T 10 \
-            -d || true
+          # If OpenAPI is too small or invalid, fallback to baseline scan against the backend
+          OPENAPI_SIZE=$(stat -c%s openapi.json 2>/dev/null || echo 0)
+          echo "openapi.json size: $OPENAPI_SIZE"
+          if [ "$OPENAPI_SIZE" -lt 1000 ]; then
+            echo "OpenAPI spec not usable or too small - running baseline scan against backend"
+            docker run --rm \
+              --network $NETWORK_NAME \
+              -e ZAP_AUTH_HEADER="Authorization" \
+              -e ZAP_AUTH_HEADER_VALUE="$ZAP_AUTH_HEADER_VALUE" \
+              -v $(pwd):/zap/wrk:rw \
+              -t ghcr.io/zaproxy/zaproxy:stable \
+              zap-baseline.py \
+              -t http://backend:8080 \
+              -r /zap/wrk/zap-report.html \
+              -I || true
+          else
+            echo "OpenAPI spec found and appears valid - running API scan"
+            docker run --rm \
+              --network $NETWORK_NAME \
+              -e ZAP_AUTH_HEADER="Authorization" \
+              -e ZAP_AUTH_HEADER_VALUE="$ZAP_AUTH_HEADER_VALUE" \
+              -v $(pwd):/zap/wrk:rw \
+              -t ghcr.io/zaproxy/zaproxy:stable \
+              zap-api-scan.py \
+              -t http://backend:8080 \
+              -f openapi \
+              -s /zap/wrk/openapi.json \
+              -g /zap/wrk/gen.conf \
+              -r /zap/wrk/zap-report.html \
+              -J /zap/wrk/zap-report.json \
+              -I \
+              -T 10 \
+              -d || true
+          fi
           
           echo "ZAP API scan completed"
 
