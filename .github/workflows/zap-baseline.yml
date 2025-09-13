@@ -49,7 +49,7 @@ jobs:
         run: |
           echo "Waiting for application to start..."
           for i in {1..30}; do
-            if curl -s http://localhost:8080/api/reservation/tables >/dev/null; then
+            if curl -s http://localhost:8080 >/dev/null; then
               echo "Application is ready!"
               exit 0
             fi
@@ -58,63 +58,62 @@ jobs:
           done
           echo "Application did not start properly, but continuing anyway..."
 
-      - name: Create test user for ZAP scanning
-        run: |
-          echo "Creating test user for ZAP scanning..."
-          docker compose exec -T db psql -U usersystem -d reservsystem << EOF
-          INSERT INTO users (username, email, password, role, enabled)
-          VALUES ('zapuser', 'zap@example.com', '\$2a\$10\$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'USER', true)
-          ON CONFLICT (email) DO NOTHING;
-          EOF
-
       - name: Login to get auth token
         id: login
         run: |
-          echo "Logging in to get JWT token..."
-          # Use plain password; app hashes it. Adjust if your app expects hashed input.
-          RESPONSE=$(docker compose exec -T backend curl -s -X POST http://localhost:8080/api/auth/login \
+          echo "Logging in to get JWT token using default admin credentials..."
+          
+          # Χρησιμοποιούμε τα default admin credentials
+          RESPONSE=$(curl -s -X POST http://localhost:8080/api/auth/login \
             -H "Content-Type: application/json" \
-            -d '{"username": "zapuser", "password": "password"}')
+            -d '{"username": "admin@reservation.gr", "password": "admin"}')
           echo "Login response: $RESPONSE"
-          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
-          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-            echo "Failed to get token. Using fallback (unauthenticated scan)."
-            echo "ZAP_AUTH_HEADER_VALUE=dummy" >> $GITHUB_ENV
+          
+          # Ελέγχουμε αν η απάντηση είναι JSON
+          if echo "$RESPONSE" | jq empty 2>/dev/null; then
+            TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
+            if [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ]; then
+              echo "ZAP_AUTH_HEADER_VALUE=Bearer $TOKEN" >> $GITHUB_ENV
+              echo "Got token: ${TOKEN:0:20}..."
+            else
+              echo "Failed to get token from JSON response"
+              echo "ZAP_AUTH_HEADER_VALUE=dummy" >> $GITHUB_ENV
+            fi
           else
-            echo "ZAP_AUTH_HEADER_VALUE=Bearer $TOKEN" >> $GITHUB_ENV
-            echo "Got token: ${TOKEN:0:20}..."
+            echo "Response is not JSON - authentication failed or different format"
+            echo "ZAP_AUTH_HEADER_VALUE=dummy" >> $GITHUB_ENV
           fi
 
       - name: Get OpenAPI spec (if available)
         run: |
           echo "Fetching OpenAPI spec..."
-          docker compose exec -T backend curl -s http://localhost:8080/v3/api-docs > openapi.json || echo '{}' > openapi.json
+          curl -s http://localhost:8080/v3/api-docs > openapi.json || echo '{}' > openapi.json
           if [ -s openapi.json ] && jq empty openapi.json 2>/dev/null; then
             echo "✅ OpenAPI spec fetched ($(wc -c < openapi.json) bytes)"
           else
             echo "⚠️ No OpenAPI spec; fallback to baseline scan"
           fi
 
-      - name: Run ZAP API scan (preferred for REST APIs)
+      - name: Run ZAP API scan
         continue-on-error: true
         run: |
-          # Get compose network (e.g., restaurant-booking-system_default)
-          NETWORK_NAME=$(docker compose network ls --format "table {{.Name}}" | grep "_default" | awk '{print $1}')
+          # Get compose network
+          NETWORK_NAME=$(docker network ls --filter label=com.docker.compose.project -q | head -1 | xargs docker network inspect --format '{{.Name}}')
           if [ -z "$NETWORK_NAME" ]; then
-            NETWORK_NAME=$(docker network ls --filter label=com.docker.compose.project=$(basename $PWD) --format "{{.Name}}")
+            NETWORK_NAME="restaurant-booking-system_default"
           fi
           echo "Using network: $NETWORK_NAME"
           
-          # Create gen.conf (default rules to WARN)
+          # Create gen.conf
           cat > gen.conf << 'EOF'
-          # ZAP API Scan configuration - all rules WARN
+          # ZAP API Scan configuration
           EOF
           
-          # Run API scan with spec + auth
+          # Run API scan
           docker run --rm \
             --network $NETWORK_NAME \
-            -e ZAP_AUTH_HEADER \
-            -e ZAP_AUTH_HEADER_VALUE \
+            -e ZAP_AUTH_HEADER="Authorization" \
+            -e ZAP_AUTH_HEADER_VALUE="${{ env.ZAP_AUTH_HEADER_VALUE }}" \
             -v $(pwd):/zap/wrk:rw \
             -t ghcr.io/zaproxy/zaproxy:stable \
             zap-api-scan.py \
@@ -125,62 +124,19 @@ jobs:
             -r /zap/wrk/zap-report.html \
             -J /zap/wrk/zap-report.json \
             -I \
-            -T 15 \
+            -T 10 \
             -d || true
           
-          echo "ZAP API scan completed (exit code: $?)"
-
-      - name: Fallback to Baseline scan (if API scan fails or no spec)
-        if: failure()
-        continue-on-error: true
-        run: |
-          # Only run if openapi.json is missing or empty
-          if [ ! -s openapi.json ]; then
-            NETWORK_NAME=$(docker compose network ls --format "table {{.Name}}" | grep "_default" | awk '{print $1}')
-            if [ -z "$NETWORK_NAME" ]; then
-              NETWORK_NAME=$(docker network ls --filter label=com.docker.compose.project=$(basename $PWD) --format "{{.Name}}")
-            fi
-
-            docker run --rm \
-              --network $NETWORK_NAME \
-              -e ZAP_AUTH_HEADER \
-              -e ZAP_AUTH_HEADER_VALUE \
-              -v $(pwd):/zap/wrk:rw \
-              -t ghcr.io/zaproxy/zaproxy:stable \
-              zap-baseline.py \
-              -t http://backend:8080/api/reservation/tables \
-              -g /zap/wrk/gen.conf \
-              -r /zap/wrk/zap-report-baseline.html \
-              -J /zap/wrk/zap-report-baseline.json \
-              -I \
-              -T 15 \
-              -d || true
-
-            echo "ZAP Baseline fallback completed (exit code: $?)"
-          else
-            echo "Skipping baseline scan; openapi.json exists and is not empty."
-          fi
+          echo "ZAP API scan completed"
 
       - name: Check and summarize reports
         run: |
           echo "=== ZAP Scan Summary ==="
-          ls -la zap-report.* || true
           if [ -f zap-report.html ]; then
-            echo "✅ API Scan HTML: $(du -h zap-report.html | cut -f1)"
-            # Extract risks
-            grep -E "(High|Medium|Low)" zap-report.html | head -10 || echo "No risks found"
-          fi
-          if [ -f zap-report.json ]; then
-            echo "✅ API Scan JSON: $(du -h zap-report.json | cut -f1)"
-            jq '.site[]? | select(.alerts != null) | .alerts[]? | {name: .name, risk: .riskdesc}' zap-report.json 2>/dev/null | head -10 || echo "No alerts"
-          fi
-          if [ -f zap-report-baseline.html ]; then
-            echo "✅ Baseline HTML: $(du -h zap-report-baseline.html | cut -f1)"
-          fi
-          if [ ! -f zap-report.html ] && [ ! -f zap-report-baseline.html ]; then
-            echo "⚠️ No reports - capturing debug logs"
-            docker ps -a --filter ancestor=ghcr.io/zaproxy/zaproxy:stable --format "{{.ID}}" | xargs -r docker logs > zap-debug.log 2>&1 || true
-            echo "ZAP debug log size: $(du -h zap-debug.log | cut -f1)"
+            echo "✅ ZAP HTML report generated"
+            echo "Report size: $(du -h zap-report.html | cut -f1)"
+          else
+            echo "⚠️ No ZAP report found"
           fi
 
       - name: Upload ZAP artifacts
@@ -189,11 +145,10 @@ jobs:
         with:
           name: zap-scan-reports
           path: |
-            zap-report*.html
-            zap-report*.json
+            zap-report.html
+            zap-report.json
             openapi.json
             gen.conf
-            zap-debug.log
           if-no-files-found: ignore
 
       - name: Stop services
