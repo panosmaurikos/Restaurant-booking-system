@@ -82,13 +82,21 @@ jobs:
 
       - name: Run ZAP baseline scan
         run: |
+          # Δημιουργούμε το config file που απαιτείται
+          cat > gen.conf << 'EOF'
+          # ZAP Baseline Scan configuration
+          rules:
+            # All rules set to WARN by default
+          EOF
+          
           # Χρησιμοποιούμε το zaproxy/zap-stable image
           docker run --rm \
             --network ${{ env.NETWORK_NAME }} \
-            -v $(pwd):/zap/results \
+            -v $(pwd):/zap/wrk \
             -t zaproxy/zap-stable \
             zap-baseline.py \
             -t http://backend:8080 \
+            -g gen.conf \
             -r zap-report.html \
             -J zap-report.json \
             -x zap-report.xml
@@ -128,6 +136,7 @@ jobs:
             zap-report.html
             zap-report.json
             zap-report.xml
+            gen.conf
           if-no-files-found: warn
 
       - name: Stop services
