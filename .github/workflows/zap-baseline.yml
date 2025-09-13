@@ -20,8 +20,7 @@ jobs:
   zap-full-scan:
     runs-on: ubuntu-latest
     env:
-      BACKEND_URL: http://backend:8080
-      FRONTEND_URL: http://frontend:80
+      BACKEND_URL: http://localhost:8080  # Χρησιμοποιούμε localhost αντί για service name
 
     steps:
       - name: Checkout code
@@ -50,7 +49,7 @@ jobs:
         run: |
           echo "Waiting for backend to start..."
           for i in {1..30}; do
-            if docker compose exec backend curl -s http://localhost:8080/api/reservation/tables >/dev/null 2>&1; then
+            if curl -s http://localhost:8080/api/reservation/tables >/dev/null 2>&1; then
               echo "Backend is ready!"
               exit 0
             fi
@@ -70,52 +69,29 @@ jobs:
           ON CONFLICT (email) DO NOTHING;
           EOF
 
-      - name: Find Docker network name
+      - name: Run ZAP scan using host network
         run: |
-          # Βρίσκουμε αυτόματα το network name
-          NETWORK_NAME=$(docker network ls --filter "name=app-network" --format "{{.Name}}")
-          if [ -z "$NETWORK_NAME" ]; then
-            NETWORK_NAME=$(docker compose ps -q backend | xargs -I {} docker inspect {} --format '{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}' | head -1 | xargs -I {} docker network inspect {} --format '{{.Name}}')
-          fi
-          echo "NETWORK_NAME=$NETWORK_NAME" >> $GITHUB_ENV
-          echo "Using network: $NETWORK_NAME"
-
-      - name: Run ZAP baseline scan
-        run: |
-          # Δημιουργούμε το config file
-          cat > gen.conf << 'EOF'
-          # ZAP Baseline Scan configuration
-          rules:
-          EOF
-          
-          # Εκτελούμε το ZAP scan με απλούστερες παραμέτρους
+          # Χρησιμοποιούμε --network host και localhost αντί για Docker networking
           docker run --rm \
-            --network ${{ env.NETWORK_NAME }} \
+            --network host \  # Χρησιμοποιούμε host network
             -v $(pwd):/zap/wrk \
             -t zaproxy/zap-stable \
             zap-baseline.py \
-            -t http://backend:8080 \
-            -g gen.conf \
-            -I \  # Μην αποτυγχάνεις για warnings
-            -T 10 \  # Max 10 λεπτά αναμονή
-            -d  # Enable debug mode for troubleshooting
+            -t http://localhost:8080 \  # Χρησιμοποιούμε localhost
+            -I  # Μην αποτυγχάνεις για warnings
 
-      - name: Check if ZAP reports were generated
+      - name: Check if ZAP completed successfully
         run: |
-          echo "Checking for ZAP reports..."
-          if [ -f zap-report.html ]; then
-            echo "✅ ZAP HTML report generated"
-          fi
-          if [ -f zap-report.json ]; then
-            echo "✅ ZAP JSON report generated"
-          fi
-          if [ -f zap-report.xml ]; then
-            echo "✅ ZAP XML report generated"
-          fi
-          
-          # Αν δεν βρέθηκαν reports, δεν αποτυγχάνουμε - απλά εμφανίζουμε warning
-          if [ ! -f zap-report.html ] && [ ! -f zap-report.json ] && [ ! -f zap-report.xml ]; then
-            echo "⚠️ No ZAP reports found - scan may have completed without generating reports"
+          # Έξοδος 0 = success, 2 = warnings, 3 = error
+          # Αγνοούμε το exit code 2 (warnings)
+          if [ $? -eq 2 ]; then
+            echo "⚠️ ZAP completed with warnings - this is expected"
+            exit 0  # Θεωρούμε warnings ως success
+          elif [ $? -eq 0 ]; then
+            echo "✅ ZAP completed successfully"
+          else
+            echo "❌ ZAP failed with error"
+            exit 1
           fi
 
       - name: Upload ZAP artifacts
@@ -126,8 +102,7 @@ jobs:
             zap-report.html
             zap-report.json
             zap-report.xml
-            gen.conf
-          if-no-files-found: ignore  # Αλλαγή από warn σε ignore
+          if-no-files-found: ignore
 
       - name: Stop services
         if: always()

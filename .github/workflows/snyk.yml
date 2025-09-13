@@ -37,6 +37,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
+          image: restaurant_backend       # <--- το όνομα του backend container
           args: test --json-file-output=snyk-backend.json
 
       # 🔍 Scan frontend image
@@ -45,7 +46,9 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
+          image: restaurant_frontend      # <--- το όνομα του frontend container
           args: test --json-file-output=snyk-frontend.json
+          
 
       # 📦 Upload artifacts (JSON reports)
       - name: Upload Snyk JSON reports
