@@ -20,23 +20,23 @@
             SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
           run: |
             if [ -z "$SNYK_TOKEN" ]; then
-              echo "❌ SNYK_TOKEN is empty"
+              echo " SNYK_TOKEN is empty"
             else
-              echo "✅ SNYK_TOKEN is set"
+              echo " SNYK_TOKEN is set"
             fi
 
         - name: Set up Docker Buildx
           uses: docker/setup-buildx-action@v3
 
-        # 🏗️ Build backend image
+        #  Build backend image
         - name: Build backend image
           run: docker build -t restaurant_backend:ci -f Dockerfile-backend .
 
-        # 🏗️ Build frontend image
+        #  Build frontend image
         - name: Build frontend image
           run: docker build -t restaurant_frontend:ci -f Dockerfile-frontend .
 
-        # 🔍 Scan backend image
+        #  Scan backend image
         - name: Run Snyk scan (backend)
           uses: snyk/actions/docker@master
           continue-on-error: true   
@@ -46,7 +46,7 @@
             image: restaurant_backend:ci
             args: --json-file-output=snyk-backend.json
 
-        # 🔍 Scan frontend image
+        #  Scan frontend image
         - name: Run Snyk scan (frontend)
           uses: snyk/actions/docker@master
           env:
@@ -55,7 +55,7 @@
             image: restaurant_frontend:ci
             args: --json-file-output=snyk-frontend.json
 
-        # 📦 Upload JSON reports
+        #  Upload JSON reports
         - name: Upload Snyk JSON reports
           if: always()
           uses: actions/upload-artifact@v4

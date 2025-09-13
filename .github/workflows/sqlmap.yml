@@ -97,39 +97,39 @@ jobs:
           
           # Check for confirmed vulnerabilities
           if grep -q "confirmed" sqlmap-reports/scan.stdout.log || grep -q "highly injectable" sqlmap-reports/scan.stdout.log; then
-            echo "❌ CRITICAL: Confirmed SQL Injection vulnerabilities found!"
+            echo "CRITICAL: Confirmed SQL Injection vulnerabilities found!"
             echo ""
             echo "Vulnerable parameters found:"
             grep -E "(parameter.*confirmed|parameter.*highly injectable)" sqlmap-reports/scan.stdout.log | sort | uniq
             exit 1
           elif grep -q "injectable" sqlmap-reports/scan.stdout.log; then
-            echo "⚠️  Possible SQL Injection vulnerabilities found (may be false positives)"
+            echo "  Possible SQL Injection vulnerabilities found (may be false positives)"
             echo ""
             echo "Possible vulnerable parameters:"
             grep -E "parameter.*appears to be.*injectable" sqlmap-reports/scan.stdout.log | sort | uniq
             echo ""
             echo "Note: These may be false positives. Please manually verify the code."
           else
-            echo "✅ No SQL Injection vulnerabilities detected"
+            echo " No SQL Injection vulnerabilities detected"
           fi
 
       - name: Generate security report
         if: always()
         run: |
-          echo "📊 SQLMap Security Report" > sqlmap-reports/security-report.md
+          echo " SQLMap Security Report" > sqlmap-reports/security-report.md
           echo "=========================" >> sqlmap-reports/security-report.md
           echo "" >> sqlmap-reports/security-report.md
           echo "Scan date: $(date)" >> sqlmap-reports/security-report.md
           echo "" >> sqlmap-reports/security-report.md
           
           if grep -q "injectable" sqlmap-reports/scan.stdout.log; then
-            echo "## ⚠️ POSSIBLE VULNERABILITIES FOUND" >> sqlmap-reports/security-report.md
+            echo "##  POSSIBLE VULNERABILITIES FOUND" >> sqlmap-reports/security-report.md
             echo "" >> sqlmap-reports/security-report.md
             echo "**Note:** These may be false positives. Manual verification required." >> sqlmap-reports/security-report.md
             echo "" >> sqlmap-reports/security-report.md
             grep -E "parameter.*appears to be.*injectable" sqlmap-reports/scan.stdout.log | sort | uniq >> sqlmap-reports/security-report.md
           else
-            echo "## ✅ NO VULNERABILITIES DETECTED" >> sqlmap-reports/security-report.md
+            echo "##  NO VULNERABILITIES DETECTED" >> sqlmap-reports/security-report.md
           fi
           
           echo "" >> sqlmap-reports/security-report.md

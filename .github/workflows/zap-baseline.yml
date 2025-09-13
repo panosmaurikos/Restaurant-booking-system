@@ -63,13 +63,11 @@ jobs:
         run: |
           echo "Logging in to get JWT token using default admin credentials..."
           
-          # Χρησιμοποιούμε τα default admin credentials
           RESPONSE=$(curl -s -X POST http://localhost:8080/api/auth/login \
             -H "Content-Type: application/json" \
             -d '{"username": "admin@reservation.gr", "password": "admin"}')
           echo "Login response: $RESPONSE"
           
-          # Ελέγχουμε αν η απάντηση είναι JSON
           if echo "$RESPONSE" | jq empty 2>/dev/null; then
             TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
             if [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ]; then
@@ -89,9 +87,9 @@ jobs:
           echo "Fetching OpenAPI spec..."
           curl -s http://localhost:8080/v3/api-docs > openapi.json || echo '{}' > openapi.json
           if [ -s openapi.json ] && jq empty openapi.json 2>/dev/null; then
-            echo "✅ OpenAPI spec fetched ($(wc -c < openapi.json) bytes)"
+            echo "OpenAPI spec fetched ($(wc -c < openapi.json) bytes)"
           else
-            echo "⚠️ No OpenAPI spec; fallback to baseline scan"
+            echo "No OpenAPI spec; fallback to baseline scan"
           fi
 
       - name: Run ZAP API scan
@@ -110,7 +108,6 @@ jobs:
           EOF
           
           # Run API scan
-          # If OpenAPI is too small or invalid, fallback to baseline scan against the backend
           OPENAPI_SIZE=$(stat -c%s openapi.json 2>/dev/null || echo 0)
           echo "openapi.json size: $OPENAPI_SIZE"
           if [ "$OPENAPI_SIZE" -lt 1000 ]; then
@@ -151,10 +148,10 @@ jobs:
         run: |
           echo "=== ZAP Scan Summary ==="
           if [ -f zap-report.html ]; then
-            echo "✅ ZAP HTML report generated"
+            echo " ZAP HTML report generated"
             echo "Report size: $(du -h zap-report.html | cut -f1)"
           else
-            echo "⚠️ No ZAP report found"
+            echo " No ZAP report found"
           fi
 
       - name: Upload ZAP artifacts

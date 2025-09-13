@@ -17,7 +17,7 @@ jobs:
 
       - name: Run Semgrep (produce SARIF + JSON)
         run: |
-          echo "📋 Running Semgrep scan..."
+          echo " Running Semgrep scan..."
           docker run --rm \
             -v "$(pwd):/src" \
             semgrep/semgrep:latest \
@@ -25,7 +25,7 @@ jobs:
 
       - name: Show Semgrep results (summary)
         run: |
-          echo "🔍 Semgrep findings summary:"
+          echo " Semgrep findings summary:"
           sudo apt-get update -y
           sudo apt-get install -y jq || true
           if [ -f semgrep-results.json ]; then

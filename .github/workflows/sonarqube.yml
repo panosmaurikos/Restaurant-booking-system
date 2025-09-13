@@ -4,7 +4,7 @@ on:
   workflow_call:
     secrets:
       SONAR_TOKEN:
-        required: false  # Δεν είναι υποχρεωτικό αν δημιουργούμε token δυναμικά
+        required: false  
 
 permissions:
   contents: read
@@ -32,7 +32,6 @@ jobs:
             sleep 10
           done
 
-          # Δημιουργία token μέσω API
           echo "Generating Sonar token via API..."
           resp=$(curl -s -u admin:admin -X POST "http://localhost:9000/api/user_tokens/generate" -d "name=ci-token")
           echo "API response: $resp"
@@ -78,7 +77,6 @@ jobs:
           TOKEN="${SONAR_CI_TOKEN:-$SONAR_TOKEN}"
           PROJECT_KEY="restaurant-backend"
 
-          # Helper for authenticated curl using token (token as username, empty password)
           auth_curl() {
             curl -s -u "${TOKEN}:" "$@"
           }
