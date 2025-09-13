@@ -42,14 +42,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/reservsystem
-      SPRING_DATASOURCE_USERNAME: usersystem
-      SPRING_DATASOURCE_PASSWORD: passreserv
+    env_file:
+      - .env
     ports:
       - "8080:8080"
     volumes:
-      - ./RestaurantBookSystem:/app  # backend code
+      - ./RestaurantBookSystem:/app
     networks:
       - app-network
 
