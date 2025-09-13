@@ -82,13 +82,13 @@ jobs:
 
       - name: Run ZAP baseline scan
         run: |
-          # Δημιουργούμε το config file που απαιτείται
+          # Δημιουργούμε το config file
           cat > gen.conf << 'EOF'
           # ZAP Baseline Scan configuration
           rules:
           EOF
           
-          # Χρησιμοποιούμε το zaproxy/zap-stable image με πιο απλές παραμέτρους
+          # Εκτελούμε το ZAP scan με απλούστερες παραμέτρους
           docker run --rm \
             --network ${{ env.NETWORK_NAME }} \
             -v $(pwd):/zap/wrk \
@@ -96,17 +96,26 @@ jobs:
             zap-baseline.py \
             -t http://backend:8080 \
             -g gen.conf \
-            -I  # ΔΕΝ αποτυγχάνει σε warnings, μόνο σε critical errors
+            -I \  # Μην αποτυγχάνεις για warnings
+            -T 10 \  # Max 10 λεπτά αναμονή
+            -d  # Enable debug mode for troubleshooting
 
       - name: Check if ZAP reports were generated
         run: |
+          echo "Checking for ZAP reports..."
           if [ -f zap-report.html ]; then
-            echo "✅ ZAP scan completed successfully"
-            echo "Reports generated:"
-            ls -la zap-report.*
-          else
-            echo "⚠️ ZAP reports not found - scan may have had issues"
-            # Δεν αποτυγχάνουμε γιατί μπορεί να μην δημιουργήθηκε report
+            echo "✅ ZAP HTML report generated"
+          fi
+          if [ -f zap-report.json ]; then
+            echo "✅ ZAP JSON report generated"
+          fi
+          if [ -f zap-report.xml ]; then
+            echo "✅ ZAP XML report generated"
+          fi
+          
+          # Αν δεν βρέθηκαν reports, δεν αποτυγχάνουμε - απλά εμφανίζουμε warning
+          if [ ! -f zap-report.html ] && [ ! -f zap-report.json ] && [ ! -f zap-report.xml ]; then
+            echo "⚠️ No ZAP reports found - scan may have completed without generating reports"
           fi
 
       - name: Upload ZAP artifacts
@@ -118,7 +127,7 @@ jobs:
             zap-report.json
             zap-report.xml
             gen.conf
-          if-no-files-found: warn
+          if-no-files-found: ignore  # Αλλαγή από warn σε ignore
 
       - name: Stop services
         if: always()

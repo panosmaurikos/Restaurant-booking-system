@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   snyk-scan:
@@ -33,44 +32,27 @@ jobs:
         run: docker compose -f docker-compose.yml build
 
       # 🔍 Scan backend image
-      - name: Run Snyk scan on backend
-        continue-on-error: true
+      - name: Run Snyk scan (backend)
         uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: restaurant_backend
-          args: --file=Dockerfile-backend --sarif-file-output=snyk-backend.sarif
+          args: test --json-file-output=snyk-backend.json
 
       # 🔍 Scan frontend image
-      - name: Run Snyk scan on frontend
-        continue-on-error: true
+      - name: Run Snyk scan (frontend)
         uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: restaurant_frontend
-          args: --file=Dockerfile-frontend --sarif-file-output=snyk-frontend.sarif
+          args: test --json-file-output=snyk-frontend.json
 
-      - name: Upload SARIF results (backend)
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk-backend.sarif
-          category: snyk-backend
-
-      - name: Upload SARIF results (frontend)
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk-frontend.sarif
-          category: snyk-frontend
-
-      - name: Upload raw artifacts
+      # 📦 Upload artifacts (JSON reports)
+      - name: Upload Snyk JSON reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: snyk-raw-output
+          name: snyk-json-reports
           path: |
-            snyk-backend.sarif
-            snyk-frontend.sarif
+            snyk-backend.json
+            snyk-frontend.json
