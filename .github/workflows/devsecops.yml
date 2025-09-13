@@ -55,7 +55,21 @@ jobs:
   zap-baseline:
     name: ZAP Baseline Scan
     uses: ./.github/workflows/zap-baseline.yml
+    secrets:
+      SECRET_JWT: ${{ secrets.SECRET_JWT }}
+      SECRET_KEY_AES: ${{ secrets.SECRET_KEY_AES }}
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+      OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+      OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
   
   sqlmap:
     name: SQL Injection Scan (SQLMap)
     uses: ./.github/workflows/sqlmap.yml
+    secrets:
+      SECRET_JWT: ${{ secrets.SECRET_JWT }}
+      SECRET_KEY_AES: ${{ secrets.SECRET_KEY_AES }}
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+      OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+      OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}

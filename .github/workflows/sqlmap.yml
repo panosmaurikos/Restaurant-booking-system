@@ -2,6 +2,19 @@ name: SQL Injection Scan
 
 on:
   workflow_call:
+    secrets:
+      SECRET_JWT:
+        required: true
+      SECRET_KEY_AES:
+        required: true
+      MAIL_USERNAME:
+        required: true
+      MAIL_PASSWORD:
+        required: true
+      OAUTH_GITHUB_CLIENT_ID:
+        required: true
+      OAUTH_GITHUB_CLIENT_SECRET:
+        required: true
 
 jobs:
   sqlmap-scan:
@@ -9,6 +22,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Create .env file
+        run: |
+          echo "SPRING_DATASOURCE_URL=jdbc:postgresql://restaurant_database:5432/reservsystem" >> .env
+          echo "SPRING_DATASOURCE_USERNAME=usersystem" >> .env
+          echo "SPRING_DATASOURCE_PASSWORD=passreserv" >> .env
+          echo "SECRET_JWT=${{ secrets.SECRET_JWT }}" >> .env
+          echo "SECRET_KEY_AES=${{ secrets.SECRET_KEY_AES }}" >> .env
+          echo "MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}" >> .env
+          echo "MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}" >> .env
+          echo "GITHUB_CLIENT_ID=${{ secrets.OAUTH_GITHUB_CLIENT_ID }}" >> .env
+          echo "GITHUB_CLIENT_SECRET=${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}" >> .env
 
       - name: Start application
         run: docker compose -f docker-compose.yml up -d --build

@@ -2,6 +2,19 @@ name: ZAP Full Scan (Dockerized app + Form Auth)
 
 on:
   workflow_call:
+    secrets:
+      SECRET_JWT:
+        required: true
+      SECRET_KEY_AES:
+        required: true
+      MAIL_USERNAME:
+        required: true
+      MAIL_PASSWORD:
+        required: true
+      OAUTH_GITHUB_CLIENT_ID:
+        required: true
+      OAUTH_GITHUB_CLIENT_SECRET:
+        required: true
 
 jobs:
   zap-full-scan:
