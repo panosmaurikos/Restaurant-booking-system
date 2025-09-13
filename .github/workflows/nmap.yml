@@ -30,10 +30,10 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and start services
-        run: |
-          docker compose exec backend cat .env
-          docker compose -f docker-compose.yml up -d --build
-
+        run: docker compose -f docker-compose.yml up -d --build
+      
+      - name: Inspect .env in backend
+        run: docker compose exec backend cat .env
 
       - name: Wait for app to be ready
         run: |
