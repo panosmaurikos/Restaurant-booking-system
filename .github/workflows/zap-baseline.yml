@@ -75,14 +75,15 @@ jobs:
         id: login
         run: |
           echo "Logging in to get JWT token..."
-          # Adjust password if needed (use BCrypt hash or plain if app accepts it)
+          # Use plain password; app hashes it. Adjust if your app expects hashed input.
           RESPONSE=$(docker compose exec -T backend curl -s -X POST http://localhost:8080/api/auth/login \
             -H "Content-Type: application/json" \
             -d '{"username": "zapuser", "password": "password"}')
+          echo "Login response: $RESPONSE"
           TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
-          if [ -z "$TOKEN" ]; then
-            echo "Failed to get token. Response: $RESPONSE"
-            echo "ZAP_AUTH_HEADER_VALUE=dummy" >> $GITHUB_ENV  # Fallback
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Failed to get token. Using fallback (unauthenticated scan)."
+            echo "ZAP_AUTH_HEADER_VALUE=dummy" >> $GITHUB_ENV
           else
             echo "ZAP_AUTH_HEADER_VALUE=Bearer $TOKEN" >> $GITHUB_ENV
             echo "Got token: ${TOKEN:0:20}..."
@@ -92,26 +93,34 @@ jobs:
         run: |
           echo "Fetching OpenAPI spec..."
           docker compose exec -T backend curl -s http://localhost:8080/v3/api-docs > openapi.json || echo '{}' > openapi.json
-          echo "OpenAPI spec size: $(wc -c < openapi.json) bytes"
+          if [ -s openapi.json ] && jq empty openapi.json 2>/dev/null; then
+            echo "✅ OpenAPI spec fetched ($(wc -c < openapi.json) bytes)"
+          else
+            echo "⚠️ No OpenAPI spec; fallback to baseline scan"
+          fi
 
       - name: Run ZAP API scan (preferred for REST APIs)
         continue-on-error: true
         run: |
-          NETWORK_NAME=$(docker compose network ls --filter name=^$(basename $PWD)-default$ --format "{{.Name}}" || echo "default")
+          # Get compose network (e.g., restaurant-booking-system_default)
+          NETWORK_NAME=$(docker compose network ls --format "table {{.Name}}" | grep "_default" | awk '{print $1}')
+          if [ -z "$NETWORK_NAME" ]; then
+            NETWORK_NAME=$(docker network ls --filter label=com.docker.compose.project=$(basename $PWD) --format "{{.Name}}")
+          fi
           echo "Using network: $NETWORK_NAME"
           
-          # Create simple gen.conf for rules (ignore low-risk if needed)
+          # Create gen.conf (default rules to WARN)
           cat > gen.conf << 'EOF'
-          # Default rules: WARN all
+          # ZAP API Scan configuration - all rules WARN
           EOF
           
-          # Run API scan with OpenAPI spec + auth
+          # Run API scan with spec + auth
           docker run --rm \
             --network $NETWORK_NAME \
             -e ZAP_AUTH_HEADER \
             -e ZAP_AUTH_HEADER_VALUE \
             -v $(pwd):/zap/wrk:rw \
-            -t zaproxy/zap-stable \
+            -t ghcr.io/zaproxy/zaproxy:stable \
             zap-api-scan.py \
             -t http://backend:8080 \
             -f openapi \
@@ -120,54 +129,57 @@ jobs:
             -r /zap/wrk/zap-report.html \
             -J /zap/wrk/zap-report.json \
             -I \
-            -T 10 \
+            -T 15 \
             -d || true
           
           echo "ZAP API scan completed (exit code: $?)"
 
-      - name: Fallback to Baseline scan (if API scan fails)
-        if: failure()
+      - name: Fallback to Baseline scan (if API scan fails or no spec)
+        if: failure() || ! -s openapi.json
         continue-on-error: true
         run: |
-          NETWORK_NAME=$(docker compose network ls --filter name=^$(basename $PWD)-default$ --format "{{.Name}}" || echo "default")
+          NETWORK_NAME=$(docker compose network ls --format "table {{.Name}}" | grep "_default" | awk '{print $1}')
+          if [ -z "$NETWORK_NAME" ]; then
+            NETWORK_NAME=$(docker network ls --filter label=com.docker.compose.project=$(basename $PWD) --format "{{.Name}}")
+          fi
           
           docker run --rm \
             --network $NETWORK_NAME \
             -e ZAP_AUTH_HEADER \
             -e ZAP_AUTH_HEADER_VALUE \
             -v $(pwd):/zap/wrk:rw \
-            -t zaproxy/zap-stable \
+            -t ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
-            -t http://backend:8080/api/reservation/tables \  # Start with GET endpoint
+            -t http://backend:8080/api/reservation/tables \  # Start with known GET endpoint
             -g /zap/wrk/gen.conf \
             -r /zap/wrk/zap-report-baseline.html \
             -J /zap/wrk/zap-report-baseline.json \
             -I \
-            -T 10 \
+            -T 15 \
             -d || true
           
           echo "ZAP Baseline fallback completed (exit code: $?)"
 
       - name: Check and summarize reports
         run: |
-          echo "Checking for ZAP reports..."
+          echo "=== ZAP Scan Summary ==="
           ls -la zap-report.* || true
           if [ -f zap-report.html ]; then
-            echo "✅ API Scan HTML report generated"
-            # Extract summary (risk levels)
+            echo "✅ API Scan HTML: $(du -h zap-report.html | cut -f1)"
+            # Extract risks
             grep -E "(High|Medium|Low)" zap-report.html | head -10 || echo "No risks found"
           fi
           if [ -f zap-report.json ]; then
-            echo "✅ API Scan JSON report generated"
-            jq '.site[]? | select(.alerts != null) | .alerts[]? | {name: .name, risk: .riskcode}' zap-report.json 2>/dev/null | head -10 || echo "No alerts"
+            echo "✅ API Scan JSON: $(du -h zap-report.json | cut -f1)"
+            jq '.site[]? | select(.alerts != null) | .alerts[]? | {name: .name, risk: .riskdesc}' zap-report.json 2>/dev/null | head -10 || echo "No alerts"
           fi
           if [ -f zap-report-baseline.html ]; then
-            echo "✅ Baseline fallback HTML report generated"
+            echo "✅ Baseline HTML: $(du -h zap-report-baseline.html | cut -f1)"
           fi
           if [ ! -f zap-report.html ] && [ ! -f zap-report-baseline.html ]; then
             echo "⚠️ No reports - capturing debug logs"
-            # Capture ZAP container logs (latest)
-            docker ps -a --filter ancestor=zaproxy/zap-stable --format "{{.ID}}" | xargs -r docker logs > zap-debug.log 2>&1
+            docker ps -a --filter ancestor=ghcr.io/zaproxy/zaproxy:stable --format "{{.ID}}" | xargs -r docker logs > zap-debug.log 2>&1 || true
+            echo "ZAP debug log size: $(du -h zap-debug.log | cut -f1)"
           fi
 
       - name: Upload ZAP artifacts
