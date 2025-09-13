@@ -16,93 +16,77 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Debug SNYK_TOKEN
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "❌ SNYK_TOKEN is empty"
+          else
+            echo "✅ SNYK_TOKEN is set"
+          fi
+
       - name: Debug check files
         run: |
           echo "=== Repository structure ==="
           ls -R .
 
+      - name: Run Snyk code test (SAST)
+        continue-on-error: true
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --sarif-file-output=snyk-code.sarif
+
+      - name: Upload SARIF results (code analysis)
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-code.sarif
+          category: snyk-code
+          wait-for-processing: true
+
+  snyk-container:
+    runs-on: ubuntu-latest
+    needs: snyk-code-and-deps
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Run Snyk container test on backend (JSON + raw SARIF)
+      - name: Build images with Docker Compose
+        run: docker compose -f docker-compose.yml build
+
+      - name: Run Snyk container test on backend
+        continue-on-error: true
+        uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          set -euo pipefail
-          echo "Running Snyk container test for backend (JSON + raw SARIF)"
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "${{ github.workspace }}":/project \
-            -w /project \
-            -e SNYK_TOKEN="$SNYK_TOKEN" \
-            snyk/snyk:docker \
-              snyk container test restaurant_backend \
-                --json-file-output=/project/snyk-container-backend.json \
-                --sarif-file-output=/project/raw-snyk-container-backend.sarif || true
+        with:
+          image: restaurant_backend
+          args: --sarif-file-output=snyk-container-backend.sarif
 
-      - name: Run Snyk container test on frontend (JSON + raw SARIF)
+      - name: Run Snyk container test on frontend
+        continue-on-error: true
+        uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          set -euo pipefail
-          echo "Running Snyk container test for frontend (JSON + raw SARIF)"
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "${{ github.workspace }}":/project \
-            -w /project \
-            -e SNYK_TOKEN="$SNYK_TOKEN" \
-            snyk/snyk:docker \
-              snyk container test restaurant_frontend \
-                --json-file-output=/project/snyk-container-frontend.json \
-                --sarif-file-output=/project/raw-snyk-container-frontend.sarif || true
+        with:
+          image: restaurant_frontend
+          args: --sarif-file-output=snyk-container-frontend.sarif
 
-      - name: Install node/npm and snyk-to-sarif
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y nodejs npm jq
-          # Install snyk-to-sarif globally (converts Snyk JSON -> GitHub SARIF)
-          npm install -g snyk-to-sarif@1 || npm install -g snyk-to-sarif
-
-      - name: Convert backend JSON -> GitHub-compatible SARIF
-        run: |
-          if [ -f snyk-container-backend.json ]; then
-            echo "Converting backend JSON -> snyk-container-backend.sarif"
-            snyk-to-sarif -i snyk-container-backend.json -o snyk-container-backend.sarif || { echo "snyk-to-sarif failed for backend"; ls -la; exit 0; }
-            echo "Converted backend SARIF exists: $(ls -la snyk-container-backend.sarif || true)"
-          else
-            echo "No backend JSON found, skipping convert"
-          fi
-
-      - name: Convert frontend JSON -> GitHub-compatible SARIF
-        run: |
-          if [ -f snyk-container-frontend.json ]; then
-            echo "Converting frontend JSON -> snyk-container-frontend.sarif"
-            snyk-to-sarif -i snyk-container-frontend.json -o snyk-container-frontend.sarif || { echo "snyk-to-sarif failed for frontend"; ls -la; exit 0; }
-            echo "Converted frontend SARIF exists: $(ls -la snyk-container-frontend.sarif || true)"
-          else
-            echo "No frontend JSON found, skipping convert"
-          fi
-
-      - name: Show SARIF files (short)
-        run: |
-          for f in snyk-container-*.sarif raw-snyk-container-*.sarif; do
-            if [ -f "$f" ]; then
-              echo "---- $f (head) ----"
-              head -c 400 "$f" || true
-              echo; echo
-            fi
-          done
-
-      - name: Upload SARIF results (backend)
-        if: ${{ always() }}
+      - name: Upload SARIF results (backend container)
+        if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk-container-backend.sarif
           category: snyk-container-backend
           wait-for-processing: true
 
-      - name: Upload SARIF results (frontend)
-        if: ${{ always() }}
+      - name: Upload SARIF results (frontend container)
+        if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk-container-frontend.sarif
@@ -110,14 +94,11 @@ jobs:
           wait-for-processing: true
 
       - name: Upload raw Snyk outputs as artifact (fallback)
-        if: ${{ always() }}
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: snyk-raw-output
           path: |
-            snyk-container-backend.json
-            snyk-container-frontend.json
-            raw-snyk-container-backend.sarif
-            raw-snyk-container-frontend.sarif
             snyk-container-backend.sarif
             snyk-container-frontend.sarif
+          if-no-files-found: warn

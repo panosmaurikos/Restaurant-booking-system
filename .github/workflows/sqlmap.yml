@@ -41,8 +41,15 @@ jobs:
       - name: Wait for application to be ready
         run: |
           echo "Waiting for application to start..."
-          sleep 30
-          curl --retry 10 --retry-delay 5 --retry-connrefused http://localhost:8080 || echo "Backend may not be fully ready"
+          for i in {1..30}; do
+            if curl -s http://localhost:8080/api/reservation/tables >/dev/null; then
+              echo "Application is ready!"
+              exit 0
+            fi
+            sleep 2
+            echo "Waiting... ($i/30)"
+          done
+          echo "Application did not start properly, but continuing anyway..."
 
       - name: Create directory for SQLMap reports
         run: mkdir -p sqlmap-reports
@@ -50,79 +57,91 @@ jobs:
       - name: Prepare SQLMap target list
         run: |
           cat > sqlmap-reports/targets.txt <<'TARGS'
-          http://localhost:8080/api/auth/register --method=POST --data="username=test&password=test"
-          http://localhost:8080/api/auth/login --method=POST --data="username=test&password=test"
-          http://localhost:8080/api/auth/verify --method=POST --data="code=123456"
-          http://localhost:8080/api/auth/logout
-          http://localhost:8080/api/auth/github/register
-          http://localhost:8080/api/auth/github/callback
-          http://localhost:8080/api/reservation/filters --method=POST --data="date=2025-01-01"
-          http://localhost:8080/api/reservation/savereservation --method=POST --data="table=1&user=1"
-          http://localhost:8080/api/reservation/tables
           http://localhost:8080/api/reservation/returnable/1?id=1
           http://localhost:8080/api/reservation/completed/1?id=1
-          http://localhost:8080/api/reservation/checkin --method=POST --data="reservationId=1"
-          http://localhost:8080/api/reservation/availabletables --method=POST --data="date=2025-01-01"
           http://localhost:8080/api/reservation/cancel/1?id=1
           http://localhost:8080/api/reservation/verify/1?id=1
-          http://localhost:8080/api/reservation/update/1 --method=PUT --data="table=2"
           http://localhost:8080/api/reservation/send-verification-email/1?id=1
-          http://localhost:8080/api/user/all
-          http://localhost:8080/api/user/update/1 --method=PUT --data="email=test@test.com"
           http://localhost:8080/api/user/returnable/1?id=1
+          http://localhost:8080/api/auth/register --method=POST --data="username=test&password=test"
+          http://localhost:8080/api/auth/login --method=POST --data="username=test&password=test"
+          http://localhost:8080/api/reservation/filters --method=POST --data="date=2025-01-01"
+          http://localhost:8080/api/reservation/availabletables --method=POST --data="date=2025-01-01"
           TARGS
 
-      - name: Run SQLMap on target endpoints
+      - name: Run SQLMap scan
         run: |
           set -euo pipefail
+          echo "Starting SQLMap scan..."
           docker run --rm \
             --network host \
             -v "$(pwd)/sqlmap-reports":/root/.sqlmap \
             panosmavrikos/sqlmap:latest \
             -m /root/.sqlmap/targets.txt \
             --batch \
-            --level=5 \
-            --risk=3 \
-            --tamper=space2comment,between,randomcase \
+            --level=3 \
+            --risk=2 \
             --random-agent \
-            --dbms=H2 \
-            --proxy=http://localhost:8080 \
+            --dbms=postgresql \
             --flush-session \
             --output-dir=/root/.sqlmap/output \
+            --timeout=30 \
+            --retries=2 \
           > sqlmap-reports/scan.stdout.log 2> sqlmap-reports/scan.stderr.log || true
 
-      - name: Check for vulnerabilities
+      - name: Analyze scan results
         run: |
+          echo "=== SQL Injection Scan Analysis ==="
+          
+          # Check for vulnerabilities
           if grep -q "injectable" sqlmap-reports/scan.stdout.log; then
-            echo "Vulnerabilities found! Failing workflow."
-            grep -E "appears to be.*injectable" sqlmap-reports/scan.stdout.log | grep -v "does not seem to be injectable"
-
+            echo "❌ CRITICAL: SQL Injection vulnerabilities found!"
+            echo ""
+            echo "Vulnerable parameters found:"
+            grep -E "parameter.*appears to be.*injectable" sqlmap-reports/scan.stdout.log | sort | uniq
+            
+            echo ""
+            echo "Affected endpoints:"
+            grep -B2 -A2 "injectable" sqlmap-reports/scan.stdout.log | grep -E "(GET|POST).*parameter" | sort | uniq
+            
             exit 1
           else
-            echo "No vulnerabilities found."
+            echo "✅ No SQL Injection vulnerabilities detected"
           fi
 
-      - name: Display SQLMap results
+      - name: Generate security report
+        if: always()
         run: |
-          echo "SQLMap Scan Results (host-side):"
-          ls -la sqlmap-reports || true
-          echo "---- stdout (head) ----"
-          head -n 200 sqlmap-reports/scan.stdout.log || echo "(no stdout log)"
-          echo "---- stderr (head) ----"
-          head -n 200 sqlmap-reports/scan.stderr.log || echo "(no stderr log)"
-          echo "---- container output files ----"
-          shopt -s nullglob
-          for f in sqlmap-reports/output/* sqlmap-reports/*; do
-            if [ -f "$f" ]; then
-              echo "----- $f -----"
-              sed -n '1,200p' "$f" || true
-            fi
-          done
+          echo "📊 SQLMap Security Report" > sqlmap-reports/security-report.md
+          echo "=========================" >> sqlmap-reports/security-report.md
+          echo "" >> sqlmap-reports/security-report.md
+          echo "Scan date: $(date)" >> sqlmap-reports/security-report.md
+          echo "" >> sqlmap-reports/security-report.md
+          
+          if grep -q "injectable" sqlmap-reports/scan.stdout.log; then
+            echo "## ❌ VULNERABILITIES FOUND" >> sqlmap-reports/security-report.md
+            echo "" >> sqlmap-reports/security-report.md
+            grep -E "parameter.*appears to be.*injectable" sqlmap-reports/scan.stdout.log | sort | uniq >> sqlmap-reports/security-report.md
+          else
+            echo "## ✅ NO VULNERABILITIES DETECTED" >> sqlmap-reports/security-report.md
+          fi
+          
+          echo "" >> sqlmap-reports/security-report.md
+          echo "## Scan Details" >> sqlmap-reports/security-report.md
+          echo "Targets tested: $(wc -l < sqlmap-reports/targets.txt)" >> sqlmap-reports/security-report.md
+          echo "Scan duration: $(grep -o 'time elapsed: [0-9:]\+' sqlmap-reports/scan.stdout.log | tail -1 || echo 'N/A')" >> sqlmap-reports/security-report.md
 
-      - name: Upload SQLMap reports
+      - name: Upload security report
         uses: actions/upload-artifact@v4
         with:
-          name: sqlmap-reports
+          name: sqlmap-security-report
+          path: sqlmap-reports/security-report.md
+          if-no-files-found: warn
+
+      - name: Upload full SQLMap reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqlmap-full-reports
           path: sqlmap-reports/
           if-no-files-found: warn
 

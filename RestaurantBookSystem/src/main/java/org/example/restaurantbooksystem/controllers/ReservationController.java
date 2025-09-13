@@ -1,6 +1,11 @@
 package org.example.restaurantbooksystem.controllers;
 
-import jakarta.servlet.http.HttpServletRequest;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.example.restaurantbooksystem.classes.Reservation;
 import org.example.restaurantbooksystem.classes.User;
 import org.example.restaurantbooksystem.dtos.ReservationFilterDTO;
@@ -10,13 +15,17 @@ import org.example.restaurantbooksystem.services.EmailService;
 import org.example.restaurantbooksystem.services.ReservationService;
 import org.example.restaurantbooksystem.services.UserService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/reservation")
@@ -67,9 +76,13 @@ public class ReservationController {
 
             Reservation reservation = new Reservation(tableNumber, createdUser.getId(), people, surname, name, phone, createdUser.getEmail(), notes, date, time);
             reservation.setIsCompleted(false);
-            reservationService.saveReservation(reservation);
-            return ResponseEntity.ok("createdUser with email: " + createdUser.getEmail() + " and password: " + surname+"2025");
-        }else{
+            Reservation savedReservation = reservationService.saveReservation(reservation);
+            return ResponseEntity.ok(Map.of(
+                "createdUserEmail", createdUser.getEmail(),
+                "createdUserPassword", surname + "2025",
+                "id", savedReservation.getId()
+            ));
+        } else {
             Reservation reservation = new Reservation(tableNumber, userId, people, surname, name, phone, email, notes, date, time);
             reservation.setIsCompleted(false);
             Reservation reservation1 = reservationService.saveReservation(reservation);

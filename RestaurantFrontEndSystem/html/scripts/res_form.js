@@ -179,18 +179,24 @@ async function confirm(fields) {
       }
     );
     if (response.ok) {
-      const data = await response.json();
-      const reservationId = data.id;
-      alert("Reservation Confirmed");
-      window.location.href = `/pages/verification.html?reservationId=${reservationId}`;
+      const ct = response.headers.get("content-type");
+      if (ct && ct.includes("application/json")) {
+        const data = await response.json();
+        const reservationId = data.id;
+        alert("Reservation Confirmed");
+        window.location.href = `/pages/verification.html?reservationId=${reservationId}`;
+      } else {
+        const text = await response.text();
+        alert("Reservation Confirmed: " + text);
+      }
     } else {
-      alert("Failed");
+      const errorText = await response.text();
+      alert("Failed: " + errorText);
     }
   } catch (error) {
     console.error(error);
   }
 }
-
 logoutBtn.addEventListener("click", logout);
 backBtn.addEventListener("click", () => {
   window.location.href = "/pages/selection.html";
