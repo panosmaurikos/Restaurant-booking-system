@@ -37,6 +37,13 @@ jobs:
   nmap:
     name:  Network Security (Nmap)
     uses: ./.github/workflows/nmap.yml
+    secrets:
+      SECRET_JWT: ${{ secrets.SECRET_JWT }}
+      SECRET_KEY_AES: ${{ secrets.SECRET_KEY_AES }}
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+      OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+      OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
 
 
   sonarqube:
