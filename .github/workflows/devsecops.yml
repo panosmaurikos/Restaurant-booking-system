@@ -5,6 +5,8 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  release:
+    types: [published]
   workflow_dispatch: 
 
 permissions:
@@ -19,16 +21,19 @@ jobs:
 
   trufflehog:
     name:  Secrets Scanning (TruffleHog)
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     uses: ./.github/workflows/trufflehog.yml
 
   semgrep:
     name: Static Analysis (Semgrep)
+    if: github.event_name == 'release'
     uses: ./.github/workflows/semgrep.yml
     secrets:
       SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
  
   snyk:
     name:  Code Security (Snyk)
+    if: github.event_name == 'release'
     uses: ./.github/workflows/snyk.yml
     secrets:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -36,6 +41,7 @@ jobs:
   
   nmap:
     name:  Network Security (Nmap)
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     uses: ./.github/workflows/nmap.yml
     secrets:
       SECRET_JWT: ${{ secrets.SECRET_JWT }}
@@ -48,12 +54,14 @@ jobs:
 
   sonarqube:
     name:  Code Quality (SonarQube)
+    if: github.event_name == 'release'
     uses: ./.github/workflows/sonarqube.yml
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   zap-baseline:
     name: ZAP Baseline Scan
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     uses: ./.github/workflows/zap-baseline.yml
     secrets:
       SECRET_JWT: ${{ secrets.SECRET_JWT }}
@@ -65,6 +73,7 @@ jobs:
   
   sqlmap:
     name: SQL Injection Scan (SQLMap)
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     uses: ./.github/workflows/sqlmap.yml
     secrets:
       SECRET_JWT: ${{ secrets.SECRET_JWT }}
@@ -73,3 +82,39 @@ jobs:
       MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
       OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
       OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
+
+  report-summary:
+    name: DevSecOps Summary Reporter
+    runs-on: ubuntu-latest
+    needs: [trufflehog, nmap, sqlmap, zap-baseline]
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Summarize jobs and post comment
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const runId = process.env.GITHUB_RUN_ID;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const { data } = await github.rest.actions.listJobsForWorkflowRun({ owner, repo, run_id: runId });
+            const jobs = data.jobs.map(j => ({ name: j.name, conclusion: j.conclusion || j.status }));
+            let md = `## DevSecOps scan summary for run ${runId}\n\n`;
+            for (const j of jobs) {
+              md += `- **${j.name}**: ${j.conclusion}\n`;
+            }
+            md += `\nArtifacts: see workflow run artifacts.`;
+
+            if (context.payload.pull_request) {
+              const pr = context.payload.pull_request.number;
+              await github.rest.issues.createComment({ owner, repo, issue_number: pr, body: md });
+            } else {
+              // fallback: post as commit comment
+              await github.rest.repos.createCommitComment({ owner, repo, commit_sha: context.sha, body: md });
+            }
