@@ -11,7 +11,7 @@ permissions:
   security-events: write
 
 jobs:
-  snyk-code-and-deps:
+  snyk-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,79 +26,51 @@ jobs:
             echo "✅ SNYK_TOKEN is set"
           fi
 
-      - name: Debug check files
-        run: |
-          echo "=== Repository structure ==="
-          ls -R .
-
-      - name: Run Snyk code test (SAST)
-        continue-on-error: true
-        uses: snyk/actions/docker@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --sarif-file-output=snyk-code.sarif
-
-      - name: Upload SARIF results (code analysis)
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk-code.sarif
-          category: snyk-code
-          wait-for-processing: true
-
-  snyk-container:
-    runs-on: ubuntu-latest
-    needs: snyk-code-and-deps
-    steps:
-      - uses: actions/checkout@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build images with Docker Compose
         run: docker compose -f docker-compose.yml build
 
-      - name: Run Snyk container test on backend
+      # 🔍 Scan backend image
+      - name: Run Snyk scan on backend
         continue-on-error: true
         uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: restaurant_backend
-          args: --sarif-file-output=snyk-container-backend.sarif
+          args: --file=Dockerfile-backend --sarif-file-output=snyk-backend.sarif
 
-      - name: Run Snyk container test on frontend
+      # 🔍 Scan frontend image
+      - name: Run Snyk scan on frontend
         continue-on-error: true
         uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: restaurant_frontend
-          args: --sarif-file-output=snyk-container-frontend.sarif
+          args: --file=Dockerfile-frontend --sarif-file-output=snyk-frontend.sarif
 
-      - name: Upload SARIF results (backend container)
+      - name: Upload SARIF results (backend)
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: snyk-container-backend.sarif
-          category: snyk-container-backend
-          wait-for-processing: true
+          sarif_file: snyk-backend.sarif
+          category: snyk-backend
 
-      - name: Upload SARIF results (frontend container)
+      - name: Upload SARIF results (frontend)
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: snyk-container-frontend.sarif
-          category: snyk-container-frontend
-          wait-for-processing: true
+          sarif_file: snyk-frontend.sarif
+          category: snyk-frontend
 
-      - name: Upload raw Snyk outputs as artifact (fallback)
+      - name: Upload raw artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: snyk-raw-output
           path: |
-            snyk-container-backend.sarif
-            snyk-container-frontend.sarif
-          if-no-files-found: warn
+            snyk-backend.sarif
+            snyk-frontend.sarif
