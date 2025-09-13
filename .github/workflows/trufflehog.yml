@@ -36,9 +36,9 @@ jobs:
           if [ -f trufflehog_results.json ] && [ -s trufflehog_results.json ]; then
             cat trufflehog_results.json
             echo "================================"
-            echo "❌ SECRETS FOUND! Check the report above."
+            echo "SECRETS FOUND! Check the report above."
           else
-            echo "✅ No secrets found"
+            echo "No secrets found"
             echo "================================"
           fi
 
@@ -51,13 +51,13 @@ jobs:
       - name: Fail if secrets found
         run: |
           if [ -f trufflehog_results.json ] && [ -s trufflehog_results.json ]; then
-            echo "❌ TruffleHog found verified secrets!"
+            echo "TruffleHog found verified secrets!"
             echo "Please remove these secrets immediately and rotate them:"
             cat trufflehog_results.json
             echo "Exiting due to detected secrets."
             exit 1
           else
-            echo "✅ No secrets found - code is clean!"
+            echo "No secrets found - code is clean!"
           fi
 
       - name: Cleanup
