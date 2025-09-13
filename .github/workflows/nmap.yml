@@ -46,7 +46,7 @@ jobs:
         run: docker compose -f docker-compose.yml up -d --build
       
       - name: Inspect .env in backend
-        run: docker compose exec backend cat .env
+        run: docker compose exec backend env
 
       - name: Wait for app to be ready
         run: |
