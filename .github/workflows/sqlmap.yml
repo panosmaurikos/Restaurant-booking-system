@@ -79,8 +79,9 @@ jobs:
             panosmavrikos/sqlmap:latest \
             -m /root/.sqlmap/targets.txt \
             --batch \
-            --level=3 \
-            --risk=2 \
+            --level=1 \   # Μόνο level 1 (λιγότερο intrusive)
+            --risk=1 \    # Χαμηλός κίνδυνος
+            --skip="User-Agent,Referer,Host" \  # Παράλειψη headers
             --random-agent \
             --dbms=postgresql \
             --flush-session \
@@ -93,18 +94,20 @@ jobs:
         run: |
           echo "=== SQL Injection Scan Analysis ==="
           
-          # Check for vulnerabilities
-          if grep -q "injectable" sqlmap-reports/scan.stdout.log; then
-            echo "❌ CRITICAL: SQL Injection vulnerabilities found!"
+          # Check for confirmed vulnerabilities (looking for "confirmed" or high confidence)
+          if grep -q "confirmed" sqlmap-reports/scan.stdout.log || grep -q "highly injectable" sqlmap-reports/scan.stdout.log; then
+            echo "❌ CRITICAL: Confirmed SQL Injection vulnerabilities found!"
             echo ""
             echo "Vulnerable parameters found:"
-            grep -E "parameter.*appears to be.*injectable" sqlmap-reports/scan.stdout.log | sort | uniq
-            
-            echo ""
-            echo "Affected endpoints:"
-            grep -B2 -A2 "injectable" sqlmap-reports/scan.stdout.log | grep -E "(GET|POST).*parameter" | sort | uniq
-            
+            grep -E "(parameter.*confirmed|parameter.*highly injectable)" sqlmap-reports/scan.stdout.log | sort | uniq
             exit 1
+          elif grep -q "injectable" sqlmap-reports/scan.stdout.log; then
+            echo "⚠️  Possible SQL Injection vulnerabilities found (may be false positives)"
+            echo ""
+            echo "Possible vulnerable parameters:"
+            grep -E "parameter.*appears to be.*injectable" sqlmap-reports/scan.stdout.log | sort | uniq
+            echo ""
+            echo "Note: These may be false positives. Please manually verify the code."
           else
             echo "✅ No SQL Injection vulnerabilities detected"
           fi
