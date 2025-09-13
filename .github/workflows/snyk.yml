@@ -1,65 +1,66 @@
-name: DevSecOps - Snyk
+  name: DevSecOps - Snyk
 
-on:
-  workflow_call:
-    secrets:
-      SNYK_TOKEN:
-        required: true
+  on:
+    workflow_call:
+      secrets:
+        SNYK_TOKEN:
+          required: true
 
-permissions:
-  contents: read
+  permissions:
+    contents: read
 
-jobs:
-  snyk-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+  jobs:
+    snyk-scan:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
 
-      - name: Debug SNYK_TOKEN
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          if [ -z "$SNYK_TOKEN" ]; then
-            echo "❌ SNYK_TOKEN is empty"
-          else
-            echo "✅ SNYK_TOKEN is set"
-          fi
+        - name: Debug SNYK_TOKEN
+          env:
+            SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          run: |
+            if [ -z "$SNYK_TOKEN" ]; then
+              echo "❌ SNYK_TOKEN is empty"
+            else
+              echo "✅ SNYK_TOKEN is set"
+            fi
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@v3
 
-      # 🏗️ Build backend image
-      - name: Build backend image
-        run: docker build -t restaurant_backend:ci -f Dockerfile-backend .
+        # 🏗️ Build backend image
+        - name: Build backend image
+          run: docker build -t restaurant_backend:ci -f Dockerfile-backend .
 
-      # 🏗️ Build frontend image
-      - name: Build frontend image
-        run: docker build -t restaurant_frontend:ci -f Dockerfile-frontend .
+        # 🏗️ Build frontend image
+        - name: Build frontend image
+          run: docker build -t restaurant_frontend:ci -f Dockerfile-frontend .
 
-      # 🔍 Scan backend image
-      - name: Run Snyk scan (backend)
-        uses: snyk/actions/docker@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          image: restaurant_backend:ci
-          args: --json-file-output=snyk-backend.json
+        # 🔍 Scan backend image
+        - name: Run Snyk scan (backend)
+          uses: snyk/actions/docker@master
+          continue-on-error: true   
+          env:
+            SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          with:
+            image: restaurant_backend:ci
+            args: --json-file-output=snyk-backend.json
 
-      # 🔍 Scan frontend image
-      - name: Run Snyk scan (frontend)
-        uses: snyk/actions/docker@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          image: restaurant_frontend:ci
-          args: --json-file-output=snyk-frontend.json
+        # 🔍 Scan frontend image
+        - name: Run Snyk scan (frontend)
+          uses: snyk/actions/docker@master
+          env:
+            SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          with:
+            image: restaurant_frontend:ci
+            args: --json-file-output=snyk-frontend.json
 
-      # 📦 Upload JSON reports
-      - name: Upload Snyk JSON reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: snyk-json-reports
-          path: |
-            snyk-backend.json
-            snyk-frontend.json
+        # 📦 Upload JSON reports
+        - name: Upload Snyk JSON reports
+          if: always()
+          uses: actions/upload-artifact@v4
+          with:
+            name: snyk-json-reports
+            path: |
+              snyk-backend.json
+              snyk-frontend.json

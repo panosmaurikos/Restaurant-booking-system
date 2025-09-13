@@ -22,6 +22,7 @@ jobs:
     env:
       BACKEND_URL: http://backend:8080
       FRONTEND_URL: http://frontend:80
+      ZAP_AUTH_HEADER: "Authorization"
 
     steps:
       - name: Checkout code
@@ -43,83 +44,98 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and start services
-        run: |
-          docker compose -f docker-compose.yml up -d --build
+        run: docker compose -f docker-compose.yml up -d --build
 
       - name: Wait for backend to be ready
         run: |
           echo "Waiting for backend to start..."
           for i in {1..30}; do
-            # Δοκιμάζουμε πολλαπλά endpoints για να βρούμε κάποιο που λειτουργεί
-            if curl -s -f http://localhost:8080 >/dev/null 2>&1 || \
-               curl -s -f http://localhost:8080/actuator/health >/dev/null 2>&1 || \
-               curl -s -f http://localhost:8080/api/auth/login -X OPTIONS >/dev/null 2>&1 || \
-               curl -s -f http://localhost:8080/api/reservation/tables -X OPTIONS >/dev/null 2>&1; then
+            if docker compose exec -T backend curl -s -f http://localhost:8080/api/reservation/tables >/dev/null; then
               echo "Backend is ready!"
-              exit 0
+              break
             fi
-            sleep 2
+            sleep 5
             echo "Waiting for backend... ($i/30)"
           done
-          echo "Backend did not start properly."
-          docker compose logs backend --tail=50
-          exit 1
+          if [ $i -eq 30 ]; then
+            echo "Backend did not start properly."
+            docker compose logs backend
+            exit 1
+          fi
 
       - name: Create test user for ZAP scanning
         run: |
           echo "Creating test user for ZAP scanning..."
-          docker exec -i restaurant_database psql -U usersystem -d reservsystem << EOF
+          docker compose exec -T restaurant_database psql -U usersystem -d reservsystem << EOF
           INSERT INTO users (username, email, password, role, enabled)
-          VALUES ('zapuser', 'zap@example.com', '\$2a\$10\$N9qo8uLOickgx2ZMRZoMye3s3e6T7eQ6Y5q6U6U6U6U6U6U6U6U6U6', 'USER', true)
+          VALUES ('zapuser', 'zap@example.com', '\$2a\$10\$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'USER', true)
           ON CONFLICT (email) DO NOTHING;
           EOF
 
+      - name: Login to get auth token
+        id: login
+        run: |
+          echo "Logging in to get JWT token..."
+          RESPONSE=$(docker compose exec -T backend curl -s -X POST http://localhost:8080/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"username": "zapuser", "password": "password"}')  # Αντικατέστησε 'password' με το real password (unhashed)
+          TOKEN=$(echo "$RESPONSE" | jq -r '.token')  # Υποθέτω ότι η response έχει { "token": "..." }
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Failed to get token. Response: $RESPONSE"
+            exit 1
+          fi
+          echo "ZAP_AUTH_HEADER_VALUE=Bearer $TOKEN" >> $GITHUB_ENV
+          echo "Got token: ${TOKEN:0:10}..."
+
       - name: Find Docker network name
         run: |
-          # Απλούστερος τρόπος να βρούμε το network
-          NETWORK_NAME=$(docker network ls --filter "name=restaurant" --format "{{.Name}}" | head -1)
+          NETWORK_NAME=$(docker network ls --filter label=com.docker.compose.project --format "{{.Name}}" | head -1)
           if [ -z "$NETWORK_NAME" ]; then
-            NETWORK_NAME="restaurant-booking-system_default"  # Fallback name
+            NETWORK_NAME=$(docker compose ps -q backend | xargs docker inspect -f '{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}' | xargs docker network inspect -f '{{.Name}}')
           fi
           echo "NETWORK_NAME=$NETWORK_NAME" >> $GITHUB_ENV
           echo "Using network: $NETWORK_NAME"
 
       - name: Run ZAP baseline scan
-        continue-on-error: true
         run: |
-          # Δημιουργούμε απλό gen.conf
+          # Δημιουργούμε config file για rules (προαιρετικό, άδειο για default)
           cat > gen.conf << 'EOF'
           # ZAP Baseline Scan configuration
-          rules:
           EOF
           
-          echo "Starting ZAP scan on network: ${{ env.NETWORK_NAME }}"
+          # Τρέχουμε το scan
           docker run --rm \
             --network ${{ env.NETWORK_NAME }} \
-            -v $(pwd):/zap/wrk \
+            -e ZAP_AUTH_HEADER \
+            -e ZAP_AUTH_HEADER_VALUE \
+            -v $(pwd):/zap/wrk:rw \
             -t zaproxy/zap-stable \
             zap-baseline.py \
             -t http://backend:8080 \
             -g gen.conf \
+            -r /zap/wrk/zap-report.html \
+            -J /zap/wrk/zap-report.json \
             -I \
-            -T 3 \
-            -d
+            -T 10 \
+            -d || true  # Continue even on failure
+          
+          echo "ZAP scan completed (exit code: $?)"
 
       - name: Check if ZAP reports were generated
         run: |
           echo "Checking for ZAP reports..."
+          ls -la zap-report.* || true
           if [ -f zap-report.html ]; then
             echo "✅ ZAP HTML report generated"
-            # Εμφανίζουμε brief summary
-            grep -o '<title>.*</title>' zap-report.html || true
-          else
-            echo "⚠️ No ZAP HTML report found"
+            grep -i "risk\|alert" zap-report.html | head -20 || true
           fi
-          
-          # Fallback: αν δεν δουλέψει το ZAP, τουλάχιστον ελέγχουμε αν το backend λειτουργεί
-          echo "Testing backend connectivity..."
-          if curl -s http://localhost:8080 >/dev/null; then
-            echo "✅ Backend is accessible at http://localhost:8080"
+          if [ -f zap-report.json ]; then
+            echo "✅ ZAP JSON report generated"
+            jq '.site[]?.alerts[]? | .name, .riskdesc' zap-report.json || true
+          fi
+          if [ ! -f zap-report.html ] && [ ! -f zap-report.json ]; then
+            echo "⚠️ No reports generated. Capturing ZAP logs..."
+            docker logs $(docker ps -a -q --filter ancestor=zaproxy/zap-stable --latest) > zap-debug.log 2>&1 || true
           fi
 
       - name: Upload ZAP artifacts
@@ -131,6 +147,7 @@ jobs:
             zap-report.html
             zap-report.json
             gen.conf
+            zap-debug.log
           if-no-files-found: ignore
 
       - name: Stop services
