@@ -1,4 +1,4 @@
-name: DevSecOps - Snyk
+name: DevSecOps - Snyk (compose -> build & scan)
 
 on:
   workflow_call:
@@ -21,6 +21,7 @@ jobs:
         run: |
           if [ -z "$SNYK_TOKEN" ]; then
             echo "❌ SNYK_TOKEN is empty"
+            exit 1
           else
             echo "✅ SNYK_TOKEN is set"
           fi
@@ -28,28 +29,35 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build images with Docker Compose
-        run: docker compose -f docker-compose.yml build
+      # ---- Build images with explicit tags (reliable) ----
+      - name: Build backend image (explicit tag)
+        run: |
+          docker build -t restaurant_backend:ci -f Dockerfile-backend .
 
-      - name: Run Snyk scan (backend)
+      - name: Build frontend image (explicit tag)
+        run: |
+          docker build -t restaurant_frontend:ci -f Dockerfile-frontend .
+
+      - name: List local images (debug)
+        run: docker images | grep restaurant || docker images
+
+      # ---- Snyk scans (no SARIF, produce JSON artifacts) ----
+      - name: Run Snyk scan (backend -> JSON)
         uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: restaurant_backend
+          image: restaurant_backend:ci
           args: --json-file-output=snyk-backend.json
 
-      # 🔍 Scan frontend image
-      - name: Run Snyk scan (frontend)
+      - name: Run Snyk scan (frontend -> JSON)
         uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: restaurant_frontend
+          image: restaurant_frontend:ci
           args: --json-file-output=snyk-frontend.json
-                
 
-      # 📦 Upload artifacts (JSON reports)
       - name: Upload Snyk JSON reports
         if: always()
         uses: actions/upload-artifact@v4
