@@ -52,12 +52,6 @@ Use the provided `docker-compose.yml` file to start the application:
 docker-compose up --build
 ```
 
-### Stop the Application:
-
-To stop the application, press Ctrl+C in the terminal where Docker Compose is running, or run:
-```
-docker-compose down
-```
 
 
 
