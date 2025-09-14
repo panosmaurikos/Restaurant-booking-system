@@ -64,3 +64,80 @@
             path: |
               snyk-backend.json
               snyk-frontend.json
+
+        - name: Upload Snyk JSON reports
+          if: always()
+          uses: actions/upload-artifact@v4
+          with:
+            name: snyk-json-reports
+            path: | 
+              snyk-backend.json
+              snyk-frontend.json
+
+        - name: Display Snyk results
+          run: |
+            echo " SNYK SCAN RESULTS"
+            echo "===================="
+            
+            # Backend results
+            if [ -f snyk-backend.json ]; then
+              echo "🔧 BACKEND:"
+              backend_vulns=$(jq '.vulnerabilities | length' snyk-backend.json || echo 0)
+              echo "Vulnerabilities found: $backend_vulns"
+              
+              if [ "$backend_vulns" -gt 0 ]; then
+                echo " VULNERABILITIES:"
+                jq -r '.vulnerabilities[] | "\(.id) - \(.title)\n  Severity: \(.severity)\n  Package: \(.packageName)\n  Version: \(.version)\n  Info: \(.description)\n"' snyk-backend.json
+              else
+                echo " No vulnerabilities found in backend"
+              fi
+            else
+              echo " snyk-backend.json not found"
+            fi
+            
+            echo ""
+            
+            # Frontend results  
+            if [ -f snyk-frontend.json ]; then
+              echo " FRONTEND:"
+              frontend_vulns=$(jq '.vulnerabilities | length' snyk-frontend.json || echo 0)
+              echo "Vulnerabilities found: $frontend_vulns"
+              
+              if [ "$frontend_vulns" -gt 0 ]; then
+                echo " VULNERABILITIES:"
+                jq -r '.vulnerabilities[] | "\(.id) - \(.title)\n  Severity: \(.severity)\n  Package: \(.packageName)\n  Version: \(.version)\n  Info: \(.description)\n"' snyk-frontend.json
+              else
+                echo " No vulnerabilities found in frontend"
+              fi
+            else
+              echo " snyk-frontend.json not found"
+            fi
+
+        - name: Upload Snyk JSON reports
+          uses: actions/upload-artifact@v4
+          with:
+            name: snyk-json-reports
+            path: |
+              snyk-backend.json
+              snyk-frontend.json
+
+        - name: Fail if vulnerabilities found
+          run: |
+            total_vulns=0
+            
+            if [ -f snyk-backend.json ]; then
+              backend_vulns=$(jq '.vulnerabilities | length' snyk-backend.json || echo 0)
+              total_vulns=$((total_vulns + backend_vulns))
+            fi
+            
+            if [ -f snyk-frontend.json ]; then
+              frontend_vulns=$(jq '.vulnerabilities | length' snyk-frontend.json || echo 0)
+              total_vulns=$((total_vulns + frontend_vulns))
+            fi
+            
+            if [ "$total_vulns" -gt 0 ]; then
+              echo "Found $total_vulns total vulnerabilities - failing workflow"
+              exit 1
+            else
+              echo "No vulnerabilities found - scan passed"
+            fi

@@ -10,7 +10,6 @@ permissions:
   contents: read
   security-events: write
 
-
 jobs:
   sonarqube:
     runs-on: ubuntu-latest
@@ -34,25 +33,14 @@ jobs:
 
           echo "Generating Sonar token via API..."
           resp=$(curl -s -u admin:admin -X POST "http://localhost:9000/api/user_tokens/generate" -d "name=ci-token")
-          echo "API response: $resp"
           SONAR_CI_TOKEN=$(echo "$resp" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
           if [ -z "$SONAR_CI_TOKEN" ]; then
-            echo "Failed to create Sonar token. Response:"
-            echo "$resp"
+            echo " Failed to create Sonar token"
             exit 1
           fi
-          echo "Got token, will use it for analysis."
           echo "SONAR_CI_TOKEN=$SONAR_CI_TOKEN" >> $GITHUB_ENV
 
-      - name: Debug SONAR token
-        run: |
-          if [ -z "$SONAR_CI_TOKEN" ] && [ -z "$SONAR_TOKEN" ]; then
-            echo "No token available (SONAR_CI_TOKEN or SONAR_TOKEN)"
-            exit 1
-          fi
-          echo "Using SONAR_CI_TOKEN or secret SONAR_TOKEN"
-
-      - name: Run SonarQube scan for backend (Maven project)
+      - name: Run SonarQube scan
         env:
           SONAR_HOST_URL: http://localhost:9000
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -64,100 +52,40 @@ jobs:
             -Dsonar.projectName="Restaurant Backend" \
             -Dsonar.host.url=$SONAR_HOST_URL \
             -Dsonar.login="$TOKEN"
-            
-      - name: Wait for Sonar analysis to be processed and export results
+
+      - name: Wait for analysis and export results
         env:
           SONAR_HOST_URL: http://localhost:9000
         run: |
-          set -euo pipefail
-          sudo apt-get update -y
-          sudo apt-get install -y jq curl
+          # ... existing code ...
 
-          HOST="${SONAR_HOST_URL}"
-          TOKEN="${SONAR_CI_TOKEN:-$SONAR_TOKEN}"
-          PROJECT_KEY="restaurant-backend"
-
-          auth_curl() {
-            curl -s -u "${TOKEN}:" "$@"
-          }
-
-          echo "Polling SonarQube for completed analysis for project $PROJECT_KEY..."
-          attempts=0
-          max_attempts=40
-          sleep_seconds=5
-          while [ $attempts -lt $max_attempts ]; do
-            attempts=$((attempts+1))
-            resp=$(auth_curl "${HOST}/api/project_analyses/search?project=${PROJECT_KEY}")
-            anal_count=$(echo "$resp" | jq '.analyses | length' 2>/dev/null || echo 0)
-            if [ "$anal_count" -gt 0 ]; then
-              echo "Found $anal_count analysis entries."
-              break
-            fi
-            echo "No analyses yet (attempt $attempts/$max_attempts). Sleeping $sleep_seconds s..."
-            sleep $sleep_seconds
-          done
-
-          if [ "$anal_count" -eq 0 ]; then
-            echo "Timed out waiting for Sonar analysis to appear. Continuing to fetch whatever is available."
-          fi
-
-          echo "Fetching issues (JSON)..."
-          auth_curl "${HOST}/api/issues/search?projectKeys=${PROJECT_KEY}&ps=500" > sonar-issues.json || echo "{}" > sonar-issues.json
-          echo "Fetching measures (JSON)..."
-          auth_curl "${HOST}/api/measures/component?component=${PROJECT_KEY}&metricKeys=bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density" > sonar-measures.json || echo "{}" > sonar-measures.json
-          echo "Fetching project info (JSON)..."
-          auth_curl "${HOST}/api/components/show?component=${PROJECT_KEY}" > sonar-project.json || echo "{}" > sonar-project.json
-
-          echo "Saved Sonar results:"
-          ls -la sonar-*.json || true
-
-      - name: Print Sonar JSON reports to job log
+      - name: Display SonarQube results
         run: |
-          echo "=== SONAR ISSUES ==="
-          jq --color-output '.' sonar-issues.json || echo "no sonar-issues.json"
-          echo
-          echo "=== SONAR MEASURES ==="
-          jq --color-output '.' sonar-measures.json || echo "no sonar-measures.json"
-          echo
-          echo "=== SONAR PROJECT ==="
-          jq --color-output '.' sonar-project.json || echo "no sonar-project.json"
-
-      - name: Generate human-readable Markdown summary
-        run: |
-          PROJECT_KEY="restaurant-backend"
-          echo "# SonarQube Report — ${PROJECT_KEY}" > sonar-summary.md
-          echo "" >> sonar-summary.md
-          echo "Generated: $(date)" >> sonar-summary.md
-          echo "" >> sonar-summary.md
-          echo "## Key Measures" >> sonar-summary.md
-          if [ -f sonar-measures.json ]; then
-            jq -r '.component.measures[] | "- **\(.metric)**: \(.value)"' sonar-measures.json >> sonar-summary.md || true
-          else
-            echo "_No measures file found_" >> sonar-summary.md
-          fi
-          echo "" >> sonar-summary.md
-          echo "## Issues by severity" >> sonar-summary.md
+          echo " SONARQUBE SCAN RESULTS"
+          echo "========================"
+          
           if [ -f sonar-issues.json ]; then
-            jq -r '.issues[]?.severity' sonar-issues.json 2>/dev/null | sort | uniq -c | awk '{print "- "$2": "$1}' >> sonar-summary.md || echo "- none" >> sonar-summary.md
+            issues=$(jq '.issues | length' sonar-issues.json || echo 0)
+            echo "Total issues: $issues"
+            
+            if [ "$issues" -gt 0 ]; then
+              echo " ISSUES BY SEVERITY:"
+              jq -r '.issues[].severity' sonar-issues.json | sort | uniq -c
+              
+              echo ""
+              echo " TOP ISSUES:"
+              jq -r '
+                .issues[:20][] |
+                "\(.severity) - \(.component)\n\(.message)\n"
+              ' sonar-issues.json
+            else
+              echo " No issues found"
+            fi
           else
-            echo "_No issues file found_" >> sonar-summary.md
+            echo "sonar-issues.json not found"
           fi
 
-      - name: Show Markdown summary in logs
-        run: |
-          echo "=== Sonar Markdown Summary ==="
-          cat sonar-summary.md
-
-
-      - name: Convert Markdown summary to HTML
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y pandoc
-          if [ -f sonar-summary.md ]; then
-            pandoc sonar-summary.md -o sonar-summary.html || true
-          fi
-
-      - name: Upload Sonar results and summary as artifact
+      - name: Upload Sonar results
         uses: actions/upload-artifact@v4
         with:
           name: sonar-report
@@ -167,3 +95,18 @@ jobs:
             sonar-project.json
             sonar-summary.md
             sonar-summary.html
+
+      - name: Fail if issues found
+        run: |
+          if [ -f sonar-issues.json ]; then
+            issues=$(jq '.issues | length' sonar-issues.json || echo 0)
+            if [ "$issues" -gt 0 ]; then
+              echo " Found $issues SonarQube issues - failing workflow"
+              exit 1
+            else
+              echo " No SonarQube issues found"
+            fi
+          else
+            echo " sonar-issues.json not found - scan failed"
+            exit 1
+          fi
