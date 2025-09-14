@@ -51,7 +51,3 @@ Use the provided `docker-compose.yml` file to start the application:
 ```
 docker-compose up --build
 ```
-
-
-fesfesjujgufesgrdrggr
-
