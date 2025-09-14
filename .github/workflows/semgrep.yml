@@ -21,20 +21,28 @@ jobs:
           docker run --rm \
             -v "$(pwd):/src" \
             semgrep/semgrep:latest \
-            semgrep scan --config=auto --verbose --sarif-output=/src/semgrep-results.sarif --json --output=/src/semgrep-results.json || true
+            semgrep scan --config=auto --verbose --sarif-output=/src/semgrep-results.sarif --json --output=/src/semgrep-results.json
 
-      - name: Show Semgrep results (summary)
+      - name: Display Semgrep results
         run: |
-          echo " Semgrep findings summary:"
-          sudo apt-get update -y
-          sudo apt-get install -y jq || true
+          echo " SEMGREP SCAN RESULTS"
+          echo "======================"
+          
           if [ -f semgrep-results.json ]; then
-            jq -r '
-              .results[] |
-              "[\(.check_id)] [\(.extra.severity)] \(.path):\(.start.line) - \(.extra.message)"
-            ' semgrep-results.json || cat semgrep-results.json
+            count=$(jq '.results | length' semgrep-results.json || echo 0)
+            echo "Findings: $count"
+            
+            if [ "$count" -gt 0 ]; then
+              echo " FINDINGS:"
+              jq -r '
+                .results[] |
+                "\(.check_id) [\(.extra.severity)]\nFile: \(.path):\(.start.line)\nMessage: \(.extra.message)\n"
+              ' semgrep-results.json
+            else
+              echo " No findings found"
+            fi
           else
-            echo "No semgrep-results.json found"
+            echo " semgrep-results.json not found"
           fi
 
       - name: Upload SARIF + JSON
@@ -44,3 +52,18 @@ jobs:
           path: |
             semgrep-results.sarif
             semgrep-results.json
+
+      - name: Fail if issues found
+        run: |
+          if [ -f semgrep-results.json ]; then
+            count=$(jq '.results | length' semgrep-results.json || echo 0)
+            if [ "$count" -gt 0 ]; then
+              echo " Found $count Semgrep findings - failing workflow"
+              exit 1
+            else
+              echo "No Semgrep findings found"
+            fi
+          else
+            echo " semgrep-results.json not found - scan failed"
+            exit 1
+          fi
