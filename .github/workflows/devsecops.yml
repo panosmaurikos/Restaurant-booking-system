@@ -86,7 +86,7 @@ jobs:
   report-summary:
     name:  DevSecOps Summary
     runs-on: ubuntu-latest
-    needs: []  
+    needs: [trufflehog, nmap, sqlmap, zap-baseline]
     if: github.event_name == 'pull_request'
     permissions:
       issues: write
@@ -104,75 +104,14 @@ jobs:
             const runId = process.env.GITHUB_RUN_ID;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            
-            // Get current workflow run
-            const { data: runData } = await github.rest.actions.getWorkflowRun({
-              owner,
-              repo,
-              run_id: runId
-            });
-            
-            // Get all jobs for this workflow run
-            const { data: jobsData } = await github.rest.actions.listJobsForWorkflowRun({
-              owner,
-              repo,
-              run_id: runId,
-              filter: 'all'
-            });
-            
-            // Filter only completed jobs (not skipped)
-            const completedJobs = jobsData.jobs.filter(job => 
-              job.conclusion !== 'skipped' && job.status === 'completed'
-            );
-            
-            let md = `##  DevSecOps Pipeline - Scan Summary\n\n`;
-            md += `**Workflow:** ${runData.name}\n`;
-            md += `**Run:** [#${runId}](${runData.html_url})\n`;
-            md += `**Trigger:** ${github.event_name}\n\n`;
-            
-            // Group jobs by status
-            const byStatus = {
-              success: [],
-              failure: [],
-              cancelled: [],
-              neutral: []
-            };
-            
-            completedJobs.forEach(job => {
-              const status = job.conclusion || 'neutral';
-              if (byStatus[status]) {
-                byStatus[status].push(job);
-              }
-            });
-            
-            // Success section
-            if (byStatus.success.length > 0) {
-              md += `###  Successful (${byStatus.success.length})\n`;
-              byStatus.success.forEach(job => {
-                md += `- **${job.name}** - [Logs](${job.html_url})\n`;
-              });
-              md += '\n';
+            const { data } = await github.rest.actions.listJobsForWorkflowRun({ owner, repo, run_id: runId });
+            const jobs = data.jobs.map(j => ({ name: j.name, conclusion: j.conclusion || j.status }));
+            let md = `## DevSecOps scan summary for run ${runId}\n\n`;
+            for (const j of jobs) {
+              md += `- **${j.name}**: ${j.conclusion}\n`;
             }
-            
-            // Failure section  
-            if (byStatus.failure.length > 0) {
-              md += `###  Failed (${byStatus.failure.length})\n`;
-              byStatus.failure.forEach(job => {
-                md += `- **${job.name}** - [Logs](${job.html_url})\n`;
-              });
-              md += '\n';
-            }
-            
-            // Summary
-            md += `###  Summary\n`;
-            md += `-  **Passed:** ${byStatus.success.length}\n`;
-            md += `-  **Failed:** ${byStatus.failure.length}\n`;
-            md += `-  **Skipped:** ${jobsData.jobs.length - completedJobs.length}\n\n`;
-            
-            md += `**Artifacts:** [Download reports](${runData.html_url})\n`;
-            md += `**Security:** All scans completed successfully! `;
+            md += `\nArtifacts: see workflow run artifacts.`;
 
-            // Post comment to PR
             if (context.payload.pull_request) {
               const pr = context.payload.pull_request.number;
               await github.rest.issues.createComment({
