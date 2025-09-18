@@ -56,8 +56,17 @@ jobs:
       - name: Wait for analysis and export results
         env:
           SONAR_HOST_URL: http://localhost:9000
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          # ... existing code ...
+          # Export issues
+          curl -s -u admin:admin "$SONAR_HOST_URL/api/issues/search?componentKeys=restaurant-backend" > sonar-issues.json
+          # Export measures
+          curl -s -u admin:admin "$SONAR_HOST_URL/api/measures/component?component=restaurant-backend&metricKeys=code_smells,bugs,vulnerabilities,coverage" > sonar-measures.json
+          # Export project info
+          curl -s -u admin:admin "$SONAR_HOST_URL/api/projects/search?projects=restaurant-backend" > sonar-project.json
+          # Export summary (markdown)
+          echo "# SonarQube Summary" > sonar-summary.md
+          jq '.measures[] | "\(.metric): \(.value)"' sonar-measures.json >> sonar-summary.md
 
       - name: Display SonarQube results
         run: |
