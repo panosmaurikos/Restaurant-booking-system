@@ -52,6 +52,6 @@ Use the provided `docker-compose.yml` file to start the application:
 docker-compose up --build
 ```
 
-Use default admin credentials
+Use default admin credentials:
 `Username:` admin@reservation.gr
 `Password:` admin
