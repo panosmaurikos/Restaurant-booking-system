@@ -98,9 +98,9 @@ jobs:
             echo "_No issues file found_" >> sonar-summary.md
           fi
           echo "" >> sonar-summary.md
-          echo "## Top issues (first 10)" >> sonar-summary.md
+          echo "## All issues" >> sonar-summary.md
           if [ -f sonar-issues.json ]; then
-            jq -r '.issues[]? | "- **" + (.severity // "-") + "**: " + (.message // "") + " _(file: " + (.component // "n/a") + ")_"' sonar-issues.json | head -n 10 >> sonar-summary.md 2>/dev/null || true
+            jq -r '.issues[]? | "- **" + (.severity // "-") + "**: " + (.message // "") + " _(file: " + (.component // "n/a") + ")_"' sonar-issues.json >> sonar-summary.md 2>/dev/null || true
           fi
 
       - name: Convert Markdown summary to HTML
